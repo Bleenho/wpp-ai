@@ -1,0 +1,105 @@
+// wpp-ai — banco próprio (separado dos sistemas que consomem o serviço).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InstanceStatus {
+  DISCONNECTED
+  CONNECTING
+  CONNECTED
+}
+
+enum Flow {
+  CONFIRMATION
+  REMINDER
+  SALE
+  RESCHEDULE
+  CANCELLATION
+}
+
+/// Um sistema consumidor (ex.: Agendota). Autentica via apiKey e expõe uma API
+/// de ações ("callback") que o wpp-ai chama para executar os fluxos.
+model System {
+  id             String   @id @default(cuid())
+  name           String
+  apiKey         String   @unique // header x-api-key do sistema -> wpp-ai
+  callbackUrl    String // base URL da API de ações do sistema
+  callbackSecret String // segredo HMAC com que o wpp-ai assina os callbacks
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  instances     Instance[]
+  flowConfigs   FlowConfig[]
+  conversations Conversation[]
+
+  @@map("systems")
+}
+
+/// Uma conexão de WhatsApp (instância Evolution) de um tenant de um sistema.
+model Instance {
+  id           String         @id @default(cuid())
+  systemId     String
+  tenantRef    String // id do negócio/tenant DENTRO do sistema
+  instanceName String         @unique // nome global na Evolution
+  businessName String? // nome do negócio (saudação do robô)
+  timezone     String         @default("America/Sao_Paulo")
+  status       InstanceStatus @default(DISCONNECTED)
+  phoneNumber  String?
+  lastQrCode   String?
+  connectedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  system System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, tenantRef])
+  @@map("instances")
+}
+
+/// Configuração de um fluxo por (sistema, tenant). messageTpl usa variáveis
+/// {cliente} {negocio} {servico} {profissional} {data} {hora} {valor} {link}.
+model FlowConfig {
+  id          String   @id @default(cuid())
+  systemId    String
+  tenantRef   String
+  flow        Flow
+  enabled     Boolean  @default(false)
+  messageTpl  String
+  hoursBefore Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  system System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, tenantRef, flow])
+  @@index([systemId, tenantRef])
+  @@map("flow_configs")
+}
+
+/// Sessão de conversa (máquina de estado). flow=null + step="menu" => menu.
+model Conversation {
+  id          String   @id @default(cuid())
+  systemId    String
+  tenantRef   String
+  clientPhone String
+  clientId    String?
+  flow        Flow?
+  step        String   @default("")
+  context     Json     @default("{}")
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  system System @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([systemId, tenantRef, clientPhone])
+  @@index([systemId, tenantRef])
+  @@map("conversations")
+}

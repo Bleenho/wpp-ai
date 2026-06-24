@@ -1,0 +1,24 @@
+import express from "express";
+import { env } from "./env";
+import { systemsRouter } from "./systems/systems.routes";
+import { instancesRouter } from "./instances/instances.routes";
+import { flowsRouter } from "./flows/flows.routes";
+import { messagingRouter } from "./messaging/messaging.routes";
+import { webhookRouter } from "./webhook/webhook.routes";
+
+const app = express();
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/health", (_req, res) => {
+  res.json({ ok: true, service: "wpp-ai" });
+});
+
+app.use(systemsRouter); // /admin/systems
+app.use(instancesRouter); // /v1/instances/*
+app.use(flowsRouter); // /v1/flows
+app.use(messagingRouter); // /v1/messages
+app.use(webhookRouter); // /webhooks/evolution/:instanceName
+
+app.listen(env.PORT, () => {
+  console.log(`[wpp-ai] ouvindo na porta ${env.PORT}`);
+});
