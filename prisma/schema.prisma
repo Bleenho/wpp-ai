@@ -26,11 +26,17 @@ enum Flow {
 /// Um sistema consumidor (ex.: Agendota). Autentica via apiKey e expõe uma API
 /// de ações ("callback") que o wpp-ai chama para executar os fluxos.
 model System {
-  id             String   @id @default(cuid())
-  name           String
-  apiKey         String   @unique // header x-api-key do sistema -> wpp-ai
-  callbackUrl    String // base URL da API de ações do sistema
-  callbackSecret String // segredo HMAC com que o wpp-ai assina os callbacks
+  id     String @id @default(cuid())
+  name   String
+  apiKey String @unique // header x-api-key do sistema -> wpp-ai
+  // Qual adaptador o wpp-ai usa para falar com este sistema: "generic" (contrato
+  // HMAC) ou "agendota" (mapeia a API do Agendota). `config` é específico do
+  // adaptador (ex.: agendota = { baseUrl, apiKey }).
+  adapter        String   @default("generic")
+  config         Json     @default("{}")
+  // Usados pelo adaptador "generic" (callback HMAC). Opcionais nos demais.
+  callbackUrl    String?
+  callbackSecret String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

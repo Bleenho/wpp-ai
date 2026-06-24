@@ -1,5 +1,5 @@
 import type { ConvBase, ConvState, HandlerResult } from "../types";
-import { CallbackError, type Service } from "../callback";
+import { PortError, type Service } from "../ports";
 import { parseChoice, parseDate, numbered, formatMoneyBRL, minutesToLabel } from "../../util/format";
 import { next, done, toStoredSlots, type StoredSlot } from "./shared";
 
@@ -14,7 +14,7 @@ export async function startSale(base: ConvBase, clientId: string | null): Promis
 }
 
 async function askService(base: ConvBase, clientId: string): Promise<HandlerResult> {
-  const { services } = await base.caller.listServices();
+  const { services } = await base.port.listServices();
   if (services.length === 0) return done("No momento não há serviços disponíveis para agendar.");
   return next(servicesPrompt(services), "SALE", "service", { services }, clientId);
 }
@@ -25,7 +25,7 @@ export async function handleSale(base: ConvBase, state: ConvState): Promise<Hand
   if (step === "name") {
     const name = base.text.trim();
     if (name.length < 2) return next("Pode me dizer seu *nome*?", "SALE", "name", {}, null);
-    const { client } = await base.caller.createClient(base.phone, name);
+    const { client } = await base.port.createClient(base.phone, name);
     return askService(base, client.id);
   }
 
@@ -46,7 +46,7 @@ export async function handleSale(base: ConvBase, state: ConvState): Promise<Hand
   if (step === "date") {
     const date = parseDate(base.text, base.tz);
     if (!date) return next("Data inválida. Tente *hoje*, *amanhã* ou DD/MM.", "SALE", "date", context, clientId);
-    const { slots } = await base.caller.findSlots([context.serviceId as string], date);
+    const { slots } = await base.port.findSlots([context.serviceId as string], date);
     const stored = toStoredSlots(slots, base.tz);
     if (stored.length === 0)
       return next("Não há horários nesse dia. 😕 Tente outra data.", "SALE", "date", context, clientId);
@@ -66,7 +66,7 @@ export async function handleSale(base: ConvBase, state: ConvState): Promise<Hand
     const slot = slots[choice - 1];
     if (!clientId) return done("Ops, perdi seus dados. Digite *menu* para recomeçar.");
     try {
-      const result = await base.caller.createBooking({
+      const result = await base.port.createBooking({
         clientId,
         serviceIds: [context.serviceId as string],
         professionalId: slot.professionalId,
@@ -78,7 +78,7 @@ export async function handleSale(base: ConvBase, state: ConvState): Promise<Hand
         : `\n\nO negócio vai confirmar em breve. 😉`;
       return done(msg);
     } catch (e) {
-      if (e instanceof CallbackError) return done(`❌ ${e.message}\n\nDigite *menu* para tentar de novo.`);
+      if (e instanceof PortError) return done(`❌ ${e.message}\n\nDigite *menu* para tentar de novo.`);
       throw e;
     }
   }

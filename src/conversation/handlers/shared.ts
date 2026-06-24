@@ -1,5 +1,5 @@
 import type { ConvState, HandlerResult } from "../types";
-import type { Slot } from "../callback";
+import type { Slot } from "../ports";
 import { formatTime } from "../../util/format";
 
 /** Slot salvo no contexto da conversa (JSON-serializável). */

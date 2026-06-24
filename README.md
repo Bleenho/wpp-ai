@@ -49,27 +49,49 @@ remarcar pede data e devolve horários+profissionais.
 - `POST /v1/messages` `{ flow: CONFIRMATION|REMINDER, tenantRef, clientPhone, clientId?, bookingId?, vars }`
 
 Admin (header `x-admin-key`):
-- `POST /admin/systems` `{ name, callbackUrl, callbackSecret }` → `{ id, apiKey }`
+- `POST /admin/systems` → `{ id, apiKey }`. Corpo conforme o adaptador:
+  - generic: `{ name, adapter:"generic", callbackUrl, callbackSecret }`
+  - agendota: `{ name, adapter:"agendota", config:{ baseUrl, apiKey } }`
 
 Webhook (Evolution): `POST /webhooks/evolution/:instanceName`.
 
-## Contrato de callback (o SISTEMA precisa implementar)
+## Adaptadores (como o wpp-ai fala com cada sistema)
 
-Base = `system.callbackUrl`. Todas **POST**, corpo JSON com `tenantRef`. Cada requisição
-traz o header `x-wppai-signature` = HMAC-SHA256(corpo, `callbackSecret`) — **valide-o**.
+O motor usa a interface interna `SystemPort` (`src/conversation/ports.ts`). Cada sistema tem
+um ADAPTADOR — assim o wpp-ai roda separado e só conhece a porta, não os detalhes do sistema.
+`tenantRef` identifica o negócio dentro do sistema.
+
+### Adaptador `generic` (contrato neutro — o sistema implementa)
+Base = `callbackUrl`. Todas **POST**, corpo JSON com `tenantRef`, header
+`x-wppai-signature` = HMAC-SHA256(corpo, `callbackSecret`) — **valide-o**.
 
 | Rota | Entrada | Saída |
 |---|---|---|
-| `/services` | `{tenantRef}` | `{ services: [{id,name,price,durationMin}] }` |
-| `/slots` | `{tenantRef, serviceIds, date, professionalId?}` | `{ slots: [{iso, professionalId, professionalName}] }` |
-| `/clients/find` | `{tenantRef, phone}` | `{ client: {id,name}\|null }` |
-| `/clients/create` | `{tenantRef, phone, name}` | `{ client: {id,name} }` |
-| `/bookings/upcoming` | `{tenantRef, clientId}` | `{ bookings: [{id,label}] }` |
+| `/services` | `{tenantRef}` | `{ services:[{id,name,price,durationMin}] }` |
+| `/slots` | `{tenantRef, serviceIds, date, professionalId?}` | `{ slots:[{iso,professionalId,professionalName}] }` |
+| `/clients/find` | `{tenantRef, phone}` | `{ client:{id,name}\|null }` |
+| `/clients/create` | `{tenantRef, phone, name}` | `{ client:{id,name} }` |
+| `/bookings/upcoming` | `{tenantRef, clientId}` | `{ bookings:[{id,label}] }` |
 | `/bookings/create` | `{tenantRef, clientId, serviceIds, professionalId, startTime}` | `{ bookingId, checkoutUrl? }` |
-| `/bookings/reschedule-slots` | `{tenantRef, bookingId, date}` | `{ slots: [...] }` |
+| `/bookings/reschedule-slots` | `{tenantRef, bookingId, date}` | `{ slots:[...] }` |
 | `/bookings/reschedule` | `{tenantRef, bookingId, startTime, professionalId}` | `{ ok, error? }` |
 | `/bookings/cancel` | `{tenantRef, bookingId}` | `{ ok, refundLabel?, error? }` |
 | `/bookings/confirm` | `{tenantRef, bookingId}` | `{ ok, error? }` |
+
+### Adaptador `agendota` (usa a API que o Agendota JÁ tem)
+`tenantRef` = **slug** do negócio. `config = { baseUrl, apiKey }`.
+
+- **Leituras** reusam a API pública existente (sem mudar nada no Agendota):
+  - `GET /api/public/{slug}/services`
+  - `GET /api/public/{slug}/availability?date=&serviceIds=&professionalId=`
+- **Escritas + lookup por telefone** NÃO cabem na API pública atual (protegida por OTP de
+  e-mail / token assinado — segurança de navegador). Precisam de um endpoint **confiável**
+  (header `x-api-key`) a adicionar no Agendota, base `/api/integrations/wpp/{slug}`:
+  `GET /clients?phone=`, `POST /clients`, `GET /bookings/upcoming?clientId=`,
+  `POST /bookings`, `GET /bookings/reschedule-slots?bookingId=&date=`,
+  `POST /bookings/reschedule`, `POST /bookings/cancel`, `POST /bookings/confirm`.
+  Esses são um wrapper fino por API-key sobre os services internos que o Agendota já tem
+  (`createBooking`, `cancelBooking`, `rescheduleBookingByClient`, `findAvailableSlots`).
 
 Em erro de regra de negócio, responda `{ ok:false, error }` (ou status ≥400 com `{error}`)
 — a mensagem é repassada ao cliente no WhatsApp.

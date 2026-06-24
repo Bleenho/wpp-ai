@@ -1,5 +1,5 @@
 import type { ConvBase, ConvState, HandlerResult } from "../types";
-import { CallbackError } from "../callback";
+import { PortError } from "../ports";
 import { parseChoice } from "../../util/format";
 import { next, done } from "./shared";
 import { startReschedule } from "./reschedule";
@@ -21,10 +21,10 @@ export async function handleConfirm(base: ConvBase, state: ConvState): Promise<H
 
   if (choice === 1) {
     try {
-      await base.caller.confirmBooking(bookingId);
+      await base.port.confirmBooking(bookingId);
       return done("Perfeito! Seu horário está *confirmado*. Te esperamos! 😄");
     } catch (e) {
-      if (e instanceof CallbackError) return done(`❌ ${e.message}`);
+      if (e instanceof PortError) return done(`❌ ${e.message}`);
       throw e;
     }
   }

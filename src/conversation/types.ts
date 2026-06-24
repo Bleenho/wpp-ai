@@ -1,5 +1,5 @@
 import type { Flow } from "@prisma/client";
-import type { Caller } from "./callback";
+import type { SystemPort } from "./ports";
 
 export type { Flow };
 
@@ -22,8 +22,8 @@ export interface ConvBase {
   phone: string;
   /** Texto já trimado. */
   text: string;
-  /** Cliente do "callback" já ligado ao sistema + tenant. */
-  caller: Caller;
+  /** Porta do sistema (adaptador) já ligada ao sistema + tenant. */
+  port: SystemPort;
 }
 
 /** Resultado de um handler: resposta + próximo estado (null = encerrar). */

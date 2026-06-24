@@ -7,8 +7,6 @@ import { env } from "./env";
 export interface AuthedSystem {
   id: string;
   name: string;
-  callbackUrl: string;
-  callbackSecret: string;
 }
 
 declare global {
@@ -32,12 +30,7 @@ export async function systemAuth(req: Request, res: Response, next: NextFunction
     res.status(401).json({ error: "sistema não autorizado" });
     return;
   }
-  req.system = {
-    id: system.id,
-    name: system.name,
-    callbackUrl: system.callbackUrl,
-    callbackSecret: system.callbackSecret,
-  };
+  req.system = { id: system.id, name: system.name };
   next();
 }
 

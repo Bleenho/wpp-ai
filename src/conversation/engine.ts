@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { sendText } from "../evolution/client";
 import { toBrWhatsappNumber, toLocalPhone, numbered } from "../util/format";
-import { Caller } from "./callback";
+import { makePort } from "./adapters";
 import type { ConvBase, ConvState, Flow, HandlerResult } from "./types";
 import { startFlow, dispatch } from "./handlers/registry";
 import { done } from "./handlers/shared";
@@ -35,10 +35,7 @@ export async function handleInboundMessage(
     const text = (rawText ?? "").trim();
     if (phone.length < 10 || !text) return;
 
-    const caller = new Caller(
-      { callbackUrl: instance.system.callbackUrl, callbackSecret: instance.system.callbackSecret },
-      instance.tenantRef,
-    );
+    const port = makePort(instance.system, instance.tenantRef);
     const base: ConvBase = {
       systemId: instance.systemId,
       tenantRef: instance.tenantRef,
@@ -47,7 +44,7 @@ export async function handleInboundMessage(
       tz: instance.timezone,
       phone,
       text,
-      caller,
+      port,
     };
 
     const lower = text.toLowerCase();
@@ -123,7 +120,7 @@ async function handleMenuSelection(base: ConvBase, state: ConvState): Promise<Ha
 /** Pergunta ao sistema se este telefone já é um cliente (id) — ou null. */
 async function resolveClientId(base: ConvBase): Promise<string | null> {
   try {
-    const { client } = await base.caller.findClient(base.phone);
+    const { client } = await base.port.findClient(base.phone);
     return client?.id ?? null;
   } catch {
     return null;

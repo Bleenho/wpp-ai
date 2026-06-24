@@ -1,5 +1,5 @@
 import type { ConvBase, ConvState, HandlerResult } from "../types";
-import { CallbackError } from "../callback";
+import { PortError } from "../ports";
 import { parseChoice, parseDate, numbered } from "../../util/format";
 import { next, done, toStoredSlots, type StoredSlot } from "./shared";
 
@@ -25,7 +25,7 @@ export async function startReschedule(
   if (!clientId) return done("Não encontrei agendamentos para este número. 🤔");
   if (seed.bookingId) return askDate(clientId, seed.bookingId);
 
-  const { bookings } = await base.caller.upcomingBookings(clientId);
+  const { bookings } = await base.port.upcomingBookings(clientId);
   if (bookings.length === 0) return done("Você não tem nenhum agendamento futuro para remarcar.");
   if (bookings.length === 1) return askDate(clientId, bookings[0].id);
 
@@ -54,7 +54,7 @@ export async function handleReschedule(base: ConvBase, state: ConvState): Promis
     if (!date) return next("Data inválida. Tente *hoje*, *amanhã* ou DD/MM.", "RESCHEDULE", "date", context, clientId);
     const bookingId = context.bookingId as string;
     // O sistema decide (via política) os horários elegíveis ao remarcar este booking.
-    const { slots } = await base.caller.rescheduleSlots(bookingId, date);
+    const { slots } = await base.port.rescheduleSlots(bookingId, date);
     const stored = toStoredSlots(slots, base.tz);
     if (stored.length === 0)
       return next("Não há horários nesse dia. Tente outra data.", "RESCHEDULE", "date", context, clientId);
@@ -73,10 +73,10 @@ export async function handleReschedule(base: ConvBase, state: ConvState): Promis
     if (!choice) return next("Escolha um número da lista.", "RESCHEDULE", "slot", context, clientId);
     const slot = slots[choice - 1];
     try {
-      await base.caller.rescheduleBooking(context.bookingId as string, slot.iso, slot.professionalId);
+      await base.port.rescheduleBooking(context.bookingId as string, slot.iso, slot.professionalId);
       return done(`✅ Remarcado! Seu novo horário é *${slot.label}*. Até lá! 😉`);
     } catch (e) {
-      if (e instanceof CallbackError) return done(`❌ ${e.message}\n\nDigite *menu* se precisar de algo mais.`);
+      if (e instanceof PortError) return done(`❌ ${e.message}\n\nDigite *menu* se precisar de algo mais.`);
       throw e;
     }
   }

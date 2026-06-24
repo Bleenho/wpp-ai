@@ -1,5 +1,5 @@
 import type { ConvBase, ConvState, HandlerResult } from "../types";
-import { CallbackError } from "../callback";
+import { PortError } from "../ports";
 import { parseChoice, numbered } from "../../util/format";
 import { next, done } from "./shared";
 import { startReschedule } from "./reschedule";
@@ -26,7 +26,7 @@ export async function startCancel(
   if (!clientId) return done("Não encontrei agendamentos para este número. 🤔");
   if (seed.bookingId) return offerReschedule(clientId, seed.bookingId);
 
-  const { bookings } = await base.caller.upcomingBookings(clientId);
+  const { bookings } = await base.port.upcomingBookings(clientId);
   if (bookings.length === 0) return done("Você não tem nenhum agendamento futuro para cancelar.");
   if (bookings.length === 1) return offerReschedule(clientId, bookings[0].id);
 
@@ -57,13 +57,13 @@ export async function handleCancel(base: ConvBase, state: ConvState): Promise<Ha
     if (choice !== 2)
       return next("Responda *1* para remarcar ou *2* para cancelar.", "CANCELLATION", "offer", context, clientId);
     try {
-      const result = await base.caller.cancelBooking(bookingId);
+      const result = await base.port.cancelBooking(bookingId);
       let msg = "Tudo certo, seu agendamento foi *cancelado*.";
       if (result.refundLabel) msg += ` O estorno de ${result.refundLabel} foi solicitado.`;
       msg += " Quando quiser, é só chamar para agendar de novo. 😉";
       return done(msg);
     } catch (e) {
-      if (e instanceof CallbackError) return done(`❌ ${e.message}`);
+      if (e instanceof PortError) return done(`❌ ${e.message}`);
       throw e;
     }
   }
