@@ -1,0 +1,5 @@
+# TLS automático (Let's Encrypt). Aponte o DNS de {$WPPAI_DOMAIN} para o IP do VPS.
+# Só o wpp-ai é exposto; Evolution e bancos ficam internos.
+{$WPPAI_DOMAIN} {
+	reverse_proxy wppai:8090
+}

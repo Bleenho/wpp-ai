@@ -1,0 +1,112 @@
+# wpp-ai — stack de produção (VPS dedicado).
+# Sobe: Caddy (TLS) + wpp-ai + Postgres(wpp-ai) + Evolution API + Postgres(evolution) + Redis.
+# Só o Caddy é exposto (80/443). Evolution e os bancos ficam na rede interna.
+#
+# Uso:
+#   cd deploy && cp .env.example .env   # preencha os valores
+#   docker compose up -d --build
+#   docker compose run --rm wppai npx prisma db push   # cria o schema (1x)
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      WPPAI_DOMAIN: ${WPPAI_DOMAIN}
+    depends_on:
+      - wppai
+
+  wppai:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8090"
+      # URL que a Evolution usa p/ chamar o webhook do wpp-ai (rede interna).
+      PUBLIC_URL: "http://wppai:8090"
+      DATABASE_URL: "postgresql://wppai:${WPPAI_DB_PASSWORD}@wppai-db:5432/wppai?schema=public"
+      EVOLUTION_API_URL: "http://evolution:8080"
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN}
+      ADMIN_API_KEY: ${WPPAI_ADMIN_API_KEY}
+    depends_on:
+      wppai-db:
+        condition: service_healthy
+
+  wppai-db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wppai
+      POSTGRES_PASSWORD: ${WPPAI_DB_PASSWORD}
+      POSTGRES_DB: wppai
+    volumes:
+      - wppai_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wppai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  evolution:
+    # Confira a tag mais recente em hub.docker.com/r/atendai/evolution-api
+    image: atendai/evolution-api:v2.1.1
+    restart: unless-stopped
+    environment:
+      SERVER_URL: "http://evolution:8080"
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "postgresql"
+      DATABASE_CONNECTION_URI: "postgresql://evolution:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/evolution?schema=public"
+      DATABASE_CONNECTION_CLIENT_NAME: "evolution"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://redis:6379/6"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  evolution-db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+volumes:
+  caddy_data:
+  caddy_config:
+  wppai_db_data:
+  evolution_instances:
+  evolution_db_data:
+  redis_data:
