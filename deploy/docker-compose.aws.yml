@@ -1,0 +1,55 @@
+# wpp-ai — stack AWS (EC2 na VPC compartilhada).
+# Bancos no RDS existente (schemas wppai/evolution) → SEM Postgres em container.
+# wpp-ai PRIVADO (publica 8090 só na VPC). Sem Caddy/TLS (o Agendota chama interno).
+# As variáveis vêm de deploy/.env (gerado pelo user_data do Terraform).
+services:
+  wppai:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8090"
+      PUBLIC_URL: "http://wppai:8090" # webhook Evolution -> wppai (rede interna)
+      DATABASE_URL: ${WPPAI_DATABASE_URL}
+      EVOLUTION_API_URL: "http://evolution:8080"
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN}
+      ADMIN_API_KEY: ${WPPAI_ADMIN_API_KEY}
+    ports:
+      - "8090:8090" # alcançável pelo Agendota via IP PRIVADO da EC2
+    depends_on:
+      - evolution
+
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    restart: unless-stopped
+    environment:
+      SERVER_URL: "http://evolution:8080"
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "postgresql"
+      DATABASE_CONNECTION_URI: ${EVOLUTION_DATABASE_URI}
+      DATABASE_CONNECTION_CLIENT_NAME: "evolution"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://redis:6379/6"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+volumes:
+  evolution_instances:
+  redis_data:

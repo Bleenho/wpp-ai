@@ -1,0 +1,21 @@
+# Copie para terraform.tfvars e preencha. NÃO comite o terraform.tfvars (segredos).
+
+# SSH só do seu IP (recomendado): "1.2.3.4/32"
+my_ip = "0.0.0.0/0"
+
+# RDS compartilhado (mesmos valores usados no agendota)
+db_password = "SENHA_MASTER_DO_RDS"
+db_name     = "agendota" # database existente onde criar os schemas wppai/evolution
+
+# Segredos do wpp-ai (gere com: openssl rand -hex 32)
+evolution_api_key       = ""
+wppai_admin_api_key     = ""
+evolution_webhook_token = ""
+
+# GitHub (clone do repo privado na EC2)
+github_pat = "github_pat_xxx" # leitura de Contents do repo Bleenho/wpp-ai
+
+# Opcionais (têm default):
+# aws_region        = "us-east-1"
+# ec2_instance_type = "t3.small"
+# my_ip             = "SEU_IP/32"
