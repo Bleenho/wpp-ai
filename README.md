@@ -48,10 +48,14 @@ remarcar pede data e devolve horários+profissionais.
 - `PUT  /v1/flows` `{ tenantRef, flow, enabled?, messageTpl?, hoursBefore? }`
 - `POST /v1/messages` `{ flow: CONFIRMATION|REMINDER, tenantRef, clientPhone, clientId?, bookingId?, vars }`
 
+**Painel admin (web):** `GET /panel` — tela única (pede a `x-admin-key`) p/ ver
+sistemas, conexões (status) e ligar/editar os fluxos de cada salão num lugar só.
+
 Admin (header `x-admin-key`):
 - `POST /admin/systems` → `{ id, apiKey }`. Corpo conforme o adaptador:
   - generic: `{ name, adapter:"generic", callbackUrl, callbackSecret }`
   - agendota: `{ name, adapter:"agendota", config:{ baseUrl, apiKey } }`
+- `GET /admin/systems` · `GET /admin/instances` · `GET/PUT /admin/flows` (usados pelo painel)
 
 Webhook (Evolution): `POST /webhooks/evolution/:instanceName`.
 

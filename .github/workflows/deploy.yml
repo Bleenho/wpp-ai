@@ -1,0 +1,39 @@
+name: Deploy
+
+# Deploy contínuo do wpp-ai: a cada push na main, conecta na EC2 por SSH,
+# atualiza o código e reconstrói a stack. O build é pequeno (só tsc), roda na
+# própria EC2 (com swap) — não precisa de registry.
+#
+# Secrets necessários no repo (Settings → Secrets and variables → Actions):
+#   WPPAI_EC2_HOST     -> IP fixo (EIP) da EC2 (output `wppai_eip` do Terraform)
+#   WPPAI_EC2_USER     -> ec2-user
+#   WPPAI_EC2_SSH_KEY  -> conteúdo do wppai-key.pem (gerado pelo Terraform)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "infra/**"
+      - "**.md"
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.WPPAI_EC2_HOST }}
+          username: ${{ secrets.WPPAI_EC2_USER }}
+          key: ${{ secrets.WPPAI_EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/wppai
+            git pull --ff-only
+            COMPOSE="docker compose -f deploy/docker-compose.aws.yml"
+            $COMPOSE up -d --build
+            # aplica mudanças de schema do wpp-ai (idempotente)
+            $COMPOSE run --rm wppai npx prisma db push
+            docker image prune -f
