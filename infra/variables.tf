@@ -38,6 +38,12 @@ variable "my_ip" {
   default     = "0.0.0.0/0"
 }
 
+variable "domain_name" {
+  description = "Domínio público do wpp-ai (TLS via Caddy). Aponte o DNS para o EIP de saída."
+  type        = string
+  default     = "wpp.agendota.com"
+}
+
 # ---------- Rede/RDS compartilhados (criados pela fereoli) ----------
 variable "shared_vpc_name" {
   description = "Tag Name da VPC existente"

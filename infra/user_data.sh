@@ -52,6 +52,7 @@ unset PGPASSWORD
 # ============================================
 DB="${db_username}:${db_password}@${db_address}:5432/${db_name}"
 cat > "$APP_DIR/deploy/.env" <<ENV
+WPPAI_DOMAIN=${domain_name}
 WPPAI_DATABASE_URL=postgresql://$DB?schema=wppai&sslmode=no-verify
 EVOLUTION_DATABASE_URI=postgresql://$DB?schema=evolution&sslmode=no-verify
 EVOLUTION_API_KEY=${evolution_api_key}

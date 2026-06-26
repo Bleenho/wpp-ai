@@ -2,11 +2,16 @@
 
 Sobe o wpp-ai + Evolution numa **EC2 t3.small** na **VPC compartilhada** (mesma do
 agendota/fereoli), reusando o **RDS existente** com **schemas novos** (`wppai`,
-`evolution`) — sem RDS novo. O wpp-ai fica **privado**: só o Agendota (mesma VPC)
-o alcança em `:8090`. Espelha o padrão de `agendota/infra/`.
+`evolution`) — sem RDS novo. Público em **`wpp.agendota.com`** via Caddy (TLS).
+O Agendota (mesma VPC) chama pelo IP **privado** `:8090`; o domínio é p/ acesso
+externo/admin. Espelha o padrão de `agendota/infra/`.
 
 ## Custo estimado (us-east-1)
-- EC2 t3.small (2 GB): ~US$15/mês · EBS 30 GB: ~US$2,4 · RDS: +US$0 (reusa) → **~US$17–18/mês**.
+- EC2 t3.small (2 GB): ~US$15 · EBS 30 GB: ~US$2,4 · EIP/IP público: ~US$3,6 · RDS: +US$0 (reusa) → **~US$21/mês**.
+
+## DNS
+Depois do `apply`, pegue o output `wppai_eip` e crie: `A  wpp.agendota.com  ->  <EIP>`.
+O Caddy emite o TLS automaticamente assim que o DNS propagar (ele fica tentando até resolver).
 
 ## Pré-requisitos
 - AWS CLI configurado (mesma conta da fereoli/agendota).

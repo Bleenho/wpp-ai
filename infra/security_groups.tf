@@ -2,7 +2,7 @@
 # Security Group da EC2 do wpp-ai (na VPC compartilhada)
 # - 22: SSH (seu IP)
 # - 8090: SÓ de dentro da VPC (o Agendota chama o wpp-ai privadamente)
-# - sem 80/443: wpp-ai não é exposto à internet
+# - 80/443: público, via Caddy (TLS) p/ wpp.agendota.com (painel/API + admin)
 # ============================================
 resource "aws_security_group" "ec2" {
   name        = "${var.project_name}-ec2-sg"
@@ -18,11 +18,27 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
-    description = "wpp-ai API (somente dentro da VPC)"
+    description = "wpp-ai API (somente dentro da VPC — Agendota usa o IP privado)"
     from_port   = 8090
     to_port     = 8090
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.shared.cidr_block]
+  }
+
+  ingress {
+    description = "HTTP (Caddy/Let's Encrypt)"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS (painel/API públicos via Caddy)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {

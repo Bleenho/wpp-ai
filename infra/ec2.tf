@@ -40,6 +40,7 @@ resource "aws_instance" "app" {
     db_username             = var.db_username
     db_password             = var.db_password
     db_name                 = var.db_name
+    domain_name             = var.domain_name
     evolution_api_key       = var.evolution_api_key
     evolution_webhook_token = var.evolution_webhook_token
     wppai_admin_api_key     = var.wppai_admin_api_key
@@ -56,4 +57,14 @@ resource "aws_instance" "app" {
   lifecycle {
     ignore_changes = [ami, user_data]
   }
+}
+
+# ============================================
+# Elastic IP (IP fixo p/ apontar o DNS de wpp.agendota.com)
+# ============================================
+resource "aws_eip" "app" {
+  instance = aws_instance.app.id
+  domain   = "vpc"
+
+  tags = { Name = "${var.project_name}-eip" }
 }

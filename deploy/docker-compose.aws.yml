@@ -1,8 +1,24 @@
 # wpp-ai — stack AWS (EC2 na VPC compartilhada).
 # Bancos no RDS existente (schemas wppai/evolution) → SEM Postgres em container.
-# wpp-ai PRIVADO (publica 8090 só na VPC). Sem Caddy/TLS (o Agendota chama interno).
+# Público em ${WPPAI_DOMAIN} via Caddy (TLS). O Agendota continua chamando o
+# wppai pelo IP PRIVADO:8090 (mais rápido); o domínio é p/ acesso externo/admin.
 # As variáveis vêm de deploy/.env (gerado pelo user_data do Terraform).
 services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      WPPAI_DOMAIN: ${WPPAI_DOMAIN}
+    depends_on:
+      - wppai
+
   wppai:
     build:
       context: ..
@@ -53,3 +69,5 @@ services:
 volumes:
   evolution_instances:
   redis_data:
+  caddy_data:
+  caddy_config:
