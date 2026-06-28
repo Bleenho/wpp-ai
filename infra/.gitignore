@@ -4,4 +4,5 @@
 *.tfvars
 !*.tfvars.example
 *.pem
+.chave_a.txt
 crash.log

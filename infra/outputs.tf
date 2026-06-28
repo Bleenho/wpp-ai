@@ -1,5 +1,5 @@
 output "wppai_eip" {
-  description = "IP fixo (EIP) do wpp-ai. Aponte o DNS de ${var.domain_name} para este IP."
+  description = "IP fixo (EIP) do wpp-ai. Aponte o DNS do dominio para este IP."
   value       = aws_eip.app.public_ip
 }
 

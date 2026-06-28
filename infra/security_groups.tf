@@ -18,7 +18,7 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
-    description = "wpp-ai API (somente dentro da VPC — Agendota usa o IP privado)"
+    description = "wpp-ai API (somente na VPC, Agendota usa IP privado)"
     from_port   = 8090
     to_port     = 8090
     protocol    = "tcp"
@@ -26,7 +26,7 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
-    description = "HTTP (Caddy/Let's Encrypt)"
+    description = "HTTP (Caddy ACME)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -34,7 +34,7 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
-    description = "HTTPS (painel/API públicos via Caddy)"
+    description = "HTTPS (painel e API via Caddy)"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
