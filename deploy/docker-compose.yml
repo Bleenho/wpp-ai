@@ -56,8 +56,8 @@ services:
       retries: 10
 
   evolution:
-    # Confira a tag mais recente em hub.docker.com/r/atendai/evolution-api
-    image: atendai/evolution-api:v2.1.1
+    # Imagem oficial atual (a antiga atendai/evolution-api foi descontinuada)
+    image: evoapicloud/evolution-api:v2.2.3
     restart: unless-stopped
     environment:
       SERVER_URL: "http://evolution:8080"
