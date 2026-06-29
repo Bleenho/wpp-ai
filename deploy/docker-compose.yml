@@ -56,8 +56,9 @@ services:
       retries: 10
 
   evolution:
-    # Imagem oficial atual (a antiga atendai/evolution-api foi descontinuada)
-    image: evoapicloud/evolution-api:v2.2.3
+    # Imagem oficial atual (a antiga atendai/evolution-api foi descontinuada).
+    # 'latest' tem o Baileys atual — a v2.2.3 não gerava QR (WhatsApp Web desatualizado).
+    image: evoapicloud/evolution-api:latest
     restart: unless-stopped
     environment:
       SERVER_URL: "http://evolution:8080"
