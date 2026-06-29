@@ -15,6 +15,11 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "wpp-ai" });
 });
 
+// Raiz → painel (UX: abrir o domínio direto cai no painel).
+app.get("/", (_req, res) => {
+  res.redirect("/panel");
+});
+
 app.use(panelRouter); // /panel (HTML)
 app.use(systemsRouter); // /admin/systems
 app.use(adminRouter); // /admin/instances, /admin/flows
