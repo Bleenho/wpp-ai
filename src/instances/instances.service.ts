@@ -15,6 +15,8 @@ export interface InstanceStatus {
   qrCode: string | null;
   configured: boolean;
   autoReply: boolean;
+  /** Código de pareamento (só no retorno do connect com número). Não é persistido. */
+  pairingCode?: string | null;
 }
 
 function webhookUrl(instanceName: string): string {
@@ -28,9 +30,11 @@ function makeInstanceName(systemId: string, tenantRef: string): string {
 interface ConnectOpts {
   businessName?: string;
   timezone?: string;
+  /** Se informado (dígitos com DDI), conecta por código de pareamento em vez de QR. */
+  number?: string;
 }
 
-/** Inicia (ou reinicia) a conexão e devolve o QR. */
+/** Inicia (ou reinicia) a conexão e devolve o QR (ou o código de pareamento, se `number`). */
 export async function connect(
   systemId: string,
   tenantRef: string,
@@ -50,7 +54,7 @@ export async function connect(
     if (!/already in use|exists/i.test(msg)) console.error("[instances] createInstance:", msg);
   }
 
-  const qr = await connectInstance(instanceName);
+  const qr = await connectInstance(instanceName, opts.number);
 
   const row = await prisma.instance.upsert({
     where: { systemId_tenantRef: { systemId, tenantRef } },
@@ -71,7 +75,8 @@ export async function connect(
     },
   });
 
-  return statusOf(row);
+  // pairingCode é transitório (mostrado uma vez no retorno do connect).
+  return { ...statusOf(row), pairingCode: qr.pairingCode ?? null };
 }
 
 export async function status(systemId: string, tenantRef: string): Promise<InstanceStatus> {

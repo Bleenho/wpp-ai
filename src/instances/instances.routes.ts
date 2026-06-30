@@ -9,6 +9,8 @@ const tenantSchema = z.object({ tenantRef: z.string().min(1) });
 const connectSchema = tenantSchema.extend({
   businessName: z.string().optional(),
   timezone: z.string().optional(),
+  // Dígitos com DDI (ex.: 5511999999999). Se presente, conecta por código de pareamento.
+  number: z.string().optional(),
 });
 
 /** Conecta (ou reconecta) a instância do tenant e devolve o QR. */
@@ -22,6 +24,7 @@ instancesRouter.post("/v1/instances/connect", systemAuth, async (req, res) => {
     const data = await connect(req.system!.id, parsed.data.tenantRef, {
       businessName: parsed.data.businessName,
       timezone: parsed.data.timezone,
+      number: parsed.data.number,
     });
     res.json({ data });
   } catch (e) {

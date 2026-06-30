@@ -53,6 +53,8 @@ function readError(json: unknown): string | null {
 export interface QrResult {
   base64?: string;
   code?: string;
+  /** Código de pareamento (8 chars) — vem quando conectamos passando ?number=. */
+  pairingCode?: string;
 }
 
 export async function createInstance(instanceName: string, webhookUrl: string): Promise<void> {
@@ -72,13 +74,23 @@ export async function createInstance(instanceName: string, webhookUrl: string): 
   });
 }
 
-export async function connectInstance(instanceName: string): Promise<QrResult> {
+/**
+ * Inicia a conexão. Sem `number` → devolve o QR (base64) para escanear. Com
+ * `number` (dígitos com DDI, ex.: 5511999999999) → a Evolution devolve um
+ * `pairingCode` de 8 caracteres para o salão digitar no WhatsApp ("Conectar com
+ * número de telefone") — útil para quem está num celular só e não consegue
+ * escanear o próprio QR.
+ */
+export async function connectInstance(instanceName: string, number?: string): Promise<QrResult> {
+  const qs = number ? `?number=${encodeURIComponent(number)}` : "";
   const data = await evoFetch<{ qrcode?: QrResult } & QrResult>(
-    `/instance/connect/${encodeURIComponent(instanceName)}`,
+    `/instance/connect/${encodeURIComponent(instanceName)}${qs}`,
     { method: "GET" },
   );
   const qr = data?.qrcode ?? data ?? {};
-  return { base64: qr.base64, code: qr.code };
+  // pairingCode costuma vir na raiz; aceitamos aninhado por segurança.
+  const pairingCode = data?.pairingCode ?? qr?.pairingCode;
+  return { base64: qr.base64, code: qr.code, pairingCode };
 }
 
 export type ConnState = "open" | "connecting" | "close" | "unknown";
