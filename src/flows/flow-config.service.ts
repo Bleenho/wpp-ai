@@ -3,6 +3,23 @@ import { prisma } from "../db";
 
 export const WA_FLOWS: Flow[] = ["CONFIRMATION", "REMINDER", "SALE", "RESCHEDULE", "CANCELLATION"];
 
+/**
+ * Tipo de cada fluxo:
+ * - "campaign" (Envio): sai do sistema (agenda) p/ o cliente, sem depender de
+ *   mensagem recebida — confirmação e lembrete.
+ * - "reply" (Resposta/Atendimento): o robô reage a uma mensagem do cliente —
+ *   venda, reagendamento, cancelamento.
+ */
+export type FlowKind = "campaign" | "reply";
+
+export const FLOW_KIND: Record<Flow, FlowKind> = {
+  CONFIRMATION: "campaign",
+  REMINDER: "campaign",
+  SALE: "reply",
+  RESCHEDULE: "reply",
+  CANCELLATION: "reply",
+};
+
 interface FlowDefault {
   messageTpl: string;
   hoursBefore: number | null;
@@ -26,6 +43,7 @@ export const FLOW_DEFAULTS: Record<Flow, FlowDefault> = {
 
 export interface FlowConfigDTO {
   flow: Flow;
+  kind: FlowKind;
   enabled: boolean;
   messageTpl: string;
   hoursBefore: number | null;
@@ -36,7 +54,7 @@ export async function getFlowConfig(systemId: string, tenantRef: string, flow: F
     where: { systemId_tenantRef_flow: { systemId, tenantRef, flow } },
     select: { flow: true, enabled: true, messageTpl: true, hoursBefore: true },
   });
-  return row;
+  return row ? { ...row, kind: FLOW_KIND[row.flow] } : null;
 }
 
 /** Garante as 5 linhas (defaults) e devolve todas. Idempotente. */
@@ -57,11 +75,12 @@ export async function ensureFlowConfigs(systemId: string, tenantRef: string): Pr
       }),
     ),
   );
-  return prisma.flowConfig.findMany({
+  const rows = await prisma.flowConfig.findMany({
     where: { systemId, tenantRef },
     select: { flow: true, enabled: true, messageTpl: true, hoursBefore: true },
     orderBy: { flow: "asc" },
   });
+  return rows.map((r) => ({ ...r, kind: FLOW_KIND[r.flow] }));
 }
 
 export interface UpdateFlowInput {

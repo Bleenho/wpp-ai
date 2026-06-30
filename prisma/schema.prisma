@@ -56,6 +56,10 @@ model Instance {
   instanceName String         @unique // nome global na Evolution
   businessName String? // nome do negócio (saudação do robô)
   timezone     String         @default("America/Sao_Paulo")
+  // Atendimento automático: se false, o robô NÃO responde mensagens recebidas
+  // (só faz envios/campanhas). Conversas que o próprio robô iniciou (confirmação)
+  // continuam funcionando.
+  autoReply    Boolean        @default(true)
   status       InstanceStatus @default(DISCONNECTED)
   phoneNumber  String?
   lastQrCode   String?

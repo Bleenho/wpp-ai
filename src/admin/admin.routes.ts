@@ -3,6 +3,7 @@ import { z } from "zod";
 import { adminAuth } from "../auth";
 import { prisma } from "../db";
 import { ensureFlowConfigs, updateFlowConfig } from "../flows/flow-config.service";
+import { setAutoReply } from "../instances/instances.service";
 
 /**
  * Rotas de ADMIN (painel da plataforma). Tudo protegido por x-admin-key.
@@ -20,6 +21,7 @@ adminRouter.get("/admin/instances", adminAuth, async (_req, res) => {
       status: true,
       phoneNumber: true,
       businessName: true,
+      autoReply: true,
       system: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -33,8 +35,22 @@ adminRouter.get("/admin/instances", adminAuth, async (_req, res) => {
       status: r.status,
       phoneNumber: r.phoneNumber,
       businessName: r.businessName,
+      autoReply: r.autoReply,
     })),
   });
+});
+
+/** Liga/desliga o atendimento automático (responder mensagens) de um tenant. */
+adminRouter.put("/admin/instances/auto-reply", adminAuth, async (req, res) => {
+  const parsed = z
+    .object({ systemId: z.string().min(1), tenantRef: z.string().min(1), autoReply: z.boolean() })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(422).json({ error: "systemId, tenantRef e autoReply obrigatórios" });
+    return;
+  }
+  await setAutoReply(parsed.data.systemId, parsed.data.tenantRef, parsed.data.autoReply);
+  res.json({ data: { ok: true } });
 });
 
 /** Configs de fluxo de um (sistema, tenant) — cria os defaults se faltar. */

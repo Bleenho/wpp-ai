@@ -65,6 +65,12 @@ export async function handleInboundMessage(
     });
     const fresh = conv && conv.expiresAt.getTime() > Date.now();
 
+    // Atendimento automático desligado: o robô só faz envios (campanhas) e não
+    // responde mensagens NOVAS. Conversas já em andamento (ex.: resposta da
+    // confirmação que o próprio robô iniciou) continuam normalmente.
+    const active = Boolean(fresh && conv!.flow);
+    if (!instance.autoReply && !active) return;
+
     let result: HandlerResult;
     if (lower === "menu") {
       result = await showMenu(base);

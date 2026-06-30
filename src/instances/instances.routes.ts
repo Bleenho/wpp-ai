@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { systemAuth } from "../auth";
-import { connect, status, refresh, disconnect } from "./instances.service";
+import { connect, status, refresh, disconnect, setAutoReply } from "./instances.service";
 
 export const instancesRouter = Router();
 
@@ -41,6 +41,17 @@ instancesRouter.get("/v1/instances/status", systemAuth, async (req, res) => {
       ? await refresh(req.system!.id, tenantRef)
       : await status(req.system!.id, tenantRef);
   res.json({ data });
+});
+
+/** Liga/desliga o atendimento automático (responder mensagens recebidas). */
+instancesRouter.put("/v1/instances/auto-reply", systemAuth, async (req, res) => {
+  const parsed = z.object({ tenantRef: z.string().min(1), autoReply: z.boolean() }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(422).json({ error: "tenantRef e autoReply obrigatórios" });
+    return;
+  }
+  await setAutoReply(req.system!.id, parsed.data.tenantRef, parsed.data.autoReply);
+  res.json({ data: { ok: true } });
 });
 
 /** Desconecta a instância do tenant. */

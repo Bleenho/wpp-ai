@@ -141,7 +141,27 @@ async function loadFlows(){
   if(ix===""){ $("flows").innerHTML=""; return; }
   const inst = INSTANCES[ix];
   const flows = await api("/admin/flows?systemId="+encodeURIComponent(inst.systemId)+"&tenantRef="+encodeURIComponent(inst.tenantRef));
-  $("flows").innerHTML = flows.map(f=>flowCard(inst, f)).join("");
+  const camp = flows.filter(f=>f.kind==="campaign");
+  const reply = flows.filter(f=>f.kind==="reply");
+  const ar = inst.autoReply!==false;
+  let html = "";
+  html += '<div class="flow" style="background:#faf5ff;border-color:#e9d5ff">'+
+    '<label class="row" style="justify-content:space-between"><b style="margin:0">Atendimento automático</b>'+
+    '<input type="checkbox" '+(ar?"checked":"")+' onchange="saveAutoReply(\\''+inst.systemId+'\\',\\''+inst.tenantRef+'\\',this.checked)"/></label>'+
+    '<p class="muted" style="margin:6px 0 0">Se desligado, o robô só ENVIA (confirmação/lembrete) e não responde mensagens recebidas (deixa pro atendente).</p>'+
+    '<span id="ar_r" class="muted"></span></div>';
+  html += '<h3 style="margin:16px 0 6px;font-size:14px">📤 Envios automáticos (campanha)</h3>';
+  html += camp.map(f=>flowCard(inst,f)).join("");
+  html += '<h3 style="margin:16px 0 6px;font-size:14px">💬 Respostas automáticas (atendimento)</h3>';
+  html += reply.map(f=>flowCard(inst,f)).join("");
+  $("flows").innerHTML = html;
+}
+async function saveAutoReply(systemId, tenantRef, on){
+  try {
+    await api("/admin/instances/auto-reply", { method:"PUT", body:JSON.stringify({systemId, tenantRef, autoReply:on}) });
+    $("ar_r").textContent = "✓ salvo";
+    const i = INSTANCES.find(x=>x.systemId===systemId && x.tenantRef===tenantRef); if(i) i.autoReply = on;
+  } catch(e){ $("ar_r").textContent = e.message; }
 }
 function flowCard(inst, f){
   const timing = (f.flow==="CONFIRMATION"||f.flow==="REMINDER");

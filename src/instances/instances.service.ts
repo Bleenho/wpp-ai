@@ -14,6 +14,7 @@ export interface InstanceStatus {
   phoneNumber: string | null;
   qrCode: string | null;
   configured: boolean;
+  autoReply: boolean;
 }
 
 function webhookUrl(instanceName: string): string {
@@ -105,15 +106,25 @@ export async function disconnect(systemId: string, tenantRef: string): Promise<v
   });
 }
 
+/** Liga/desliga o atendimento automático (responder mensagens recebidas). */
+export async function setAutoReply(systemId: string, tenantRef: string, autoReply: boolean): Promise<void> {
+  await prisma.instance.updateMany({
+    where: { systemId, tenantRef },
+    data: { autoReply },
+  });
+}
+
 function statusOf(row: {
   status: "DISCONNECTED" | "CONNECTING" | "CONNECTED";
   phoneNumber: string | null;
   lastQrCode: string | null;
+  autoReply?: boolean;
 } | null): InstanceStatus {
   return {
     status: row?.status ?? "DISCONNECTED",
     phoneNumber: row?.phoneNumber ?? null,
     qrCode: row?.lastQrCode ?? null,
     configured: isConfigured(),
+    autoReply: row?.autoReply ?? true,
   };
 }
