@@ -1,7 +1,7 @@
 import type { Flow } from "@prisma/client";
 import { prisma } from "../db";
 
-export const WA_FLOWS: Flow[] = ["CONFIRMATION", "REMINDER", "SALE", "RESCHEDULE", "CANCELLATION"];
+export const WA_FLOWS: Flow[] = ["CONFIRMATION", "REMINDER", "BIRTHDAY", "SALE", "RESCHEDULE", "CANCELLATION"];
 
 /**
  * Tipo de cada fluxo:
@@ -15,6 +15,7 @@ export type FlowKind = "campaign" | "reply";
 export const FLOW_KIND: Record<Flow, FlowKind> = {
   CONFIRMATION: "campaign",
   REMINDER: "campaign",
+  BIRTHDAY: "campaign",
   SALE: "reply",
   RESCHEDULE: "reply",
   CANCELLATION: "reply",
@@ -35,6 +36,10 @@ export const FLOW_DEFAULTS: Record<Flow, FlowDefault> = {
     messageTpl:
       "Olá, {cliente}! Lembrete do seu horário no {negocio}: {data} às {hora} — {servico} com {profissional}. {link}",
     hoursBefore: 3,
+  },
+  BIRTHDAY: {
+    messageTpl: "Feliz aniversário, {cliente}! 🎉 O {negocio} deseja tudo de bom pra você. 🥳",
+    hoursBefore: null,
   },
   SALE: { messageTpl: "Olá! Que bom falar com o {negocio} 😊 Vamos agendar seu horário?", hoursBefore: null },
   RESCHEDULE: { messageTpl: "Sem problemas, {cliente}! Vamos remarcar seu horário no {negocio}.", hoursBefore: null },

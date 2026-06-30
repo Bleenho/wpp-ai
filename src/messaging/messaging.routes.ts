@@ -6,7 +6,7 @@ import { sendFlowMessage } from "./messaging.service";
 export const messagingRouter = Router();
 
 const sendSchema = z.object({
-  flow: z.enum(["CONFIRMATION", "REMINDER"]),
+  flow: z.enum(["CONFIRMATION", "REMINDER", "BIRTHDAY"]),
   tenantRef: z.string().min(1),
   clientPhone: z.string().min(10),
   clientId: z.string().optional(),

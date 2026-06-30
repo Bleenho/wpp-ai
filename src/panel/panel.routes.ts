@@ -150,10 +150,11 @@ async function loadFlows(){
     '<input type="checkbox" '+(ar?"checked":"")+' onchange="saveAutoReply(\\''+inst.systemId+'\\',\\''+inst.tenantRef+'\\',this.checked)"/></label>'+
     '<p class="muted" style="margin:6px 0 0">Se desligado, o robô só ENVIA (confirmação/lembrete) e não responde mensagens recebidas (deixa pro atendente).</p>'+
     '<span id="ar_r" class="muted"></span></div>';
-  html += '<h3 style="margin:16px 0 6px;font-size:14px">📤 Envios automáticos (campanha)</h3>';
+  html += '<h3 style="margin:16px 0 6px;font-size:14px">📤 Notificações ativas (envio)</h3>';
   html += camp.map(f=>flowCard(inst,f)).join("");
-  html += '<h3 style="margin:16px 0 6px;font-size:14px">💬 Respostas automáticas (atendimento)</h3>';
-  html += reply.map(f=>flowCard(inst,f)).join("");
+  html += '<h3 style="margin:16px 0 6px;font-size:14px">💬 Notificações passivas (atendimento)</h3>';
+  html += '<p class="muted" style="margin:0 0 8px">Com o atendimento LIGADO (acima), o robô responde DMs (nunca grupos) e resolve sozinho: <b>'+
+    reply.map(f=>f.flow).join(", ").toLowerCase()+'</b> — consultando o sistema e registrando. Sem liga/desliga por fluxo.</p>';
   $("flows").innerHTML = html;
 }
 async function saveAutoReply(systemId, tenantRef, on){

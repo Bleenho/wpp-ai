@@ -18,6 +18,7 @@ enum InstanceStatus {
 enum Flow {
   CONFIRMATION
   REMINDER
+  BIRTHDAY
   SALE
   RESCHEDULE
   CANCELLATION
@@ -59,7 +60,7 @@ model Instance {
   // Atendimento automático: se false, o robô NÃO responde mensagens recebidas
   // (só faz envios/campanhas). Conversas que o próprio robô iniciou (confirmação)
   // continuam funcionando.
-  autoReply    Boolean        @default(true)
+  autoReply    Boolean        @default(false)
   status       InstanceStatus @default(DISCONNECTED)
   phoneNumber  String?
   lastQrCode   String?

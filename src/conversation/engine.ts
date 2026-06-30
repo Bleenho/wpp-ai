@@ -4,7 +4,6 @@ import { toBrWhatsappNumber, toLocalPhone, numbered } from "../util/format";
 import { makePort } from "./adapters";
 import type { ConvBase, ConvState, Flow, HandlerResult } from "./types";
 import { startFlow, dispatch } from "./handlers/registry";
-import { done } from "./handlers/shared";
 
 const TTL_MINUTES = 20;
 
@@ -90,22 +89,10 @@ export async function handleInboundMessage(
 }
 
 async function showMenu(base: ConvBase): Promise<HandlerResult> {
-  const enabled = await prisma.flowConfig.findMany({
-    where: {
-      systemId: base.systemId,
-      tenantRef: base.tenantRef,
-      enabled: true,
-      flow: { in: MENU_FLOWS.map((m) => m.flow) },
-    },
-    select: { flow: true },
-  });
-  const set = new Set(enabled.map((e) => e.flow));
-  const options = MENU_FLOWS.filter((m) => set.has(m.flow));
-
-  if (options.length === 0) {
-    return done(`Olá! 👋 Recebemos sua mensagem e o ${base.businessName} responde já já por aqui.`);
-  }
-
+  // Só chegamos aqui com o atendimento LIGADO (o guard de autoReply retorna
+  // antes quando está desligado). Com atendimento on, todos os fluxos de
+  // resposta ficam disponíveis — não há liga/desliga por fluxo.
+  const options = MENU_FLOWS;
   const reply = `Olá! 👋 Sou o assistente do *${base.businessName}*. Como posso ajudar?\n${numbered(
     options.map((o) => o.label),
   )}\n\nResponda com o número.`;
