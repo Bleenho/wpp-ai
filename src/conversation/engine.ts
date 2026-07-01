@@ -4,6 +4,7 @@ import { toBrWhatsappNumber, toLocalPhone, numbered } from "../util/format";
 import { makePort } from "./adapters";
 import type { ConvBase, ConvState, Flow, HandlerResult } from "./types";
 import { startFlow, dispatch } from "./handlers/registry";
+import { handleCentralInbound } from "./central";
 
 const TTL_MINUTES = 20;
 
@@ -30,6 +31,17 @@ export async function handleInboundMessage(
       include: { system: true },
     });
     if (!instance || !instance.system.active) return;
+
+    // Número central: bot de suporte que só responde a donos de salão.
+    if (instance.system.isCentral) {
+      await handleCentralInbound(
+        { instanceName, systemId: instance.systemId, systemConfig: instance.system.config },
+        fromPhone,
+        rawText,
+        messageId,
+      );
+      return;
+    }
 
     const phone = toLocalPhone(fromPhone);
     const text = (rawText ?? "").trim();

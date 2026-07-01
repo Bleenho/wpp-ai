@@ -39,6 +39,9 @@ model System {
   callbackUrl    String?
   callbackSecret String?
   active         Boolean  @default(true)
+  // Sistema "central": a instância tenantRef="_central" entrega OTP e roda o bot
+  // de suporte que SÓ responde a donos de salão (ver conversation/central.ts).
+  isCentral      Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
