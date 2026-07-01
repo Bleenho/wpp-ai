@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { sendText } from "../evolution/client";
+import { guardedSend } from "../messaging/send";
 import { toBrWhatsappNumber, toLocalPhone, numbered } from "../util/format";
 import { makePort } from "./adapters";
 import type { ConvBase, ConvState, Flow, HandlerResult } from "./types";
@@ -22,6 +22,7 @@ export async function handleInboundMessage(
   instanceName: string,
   fromPhone: string,
   rawText: string,
+  messageId?: string,
 ): Promise<void> {
   try {
     const instance = await prisma.instance.findUnique({
@@ -43,6 +44,7 @@ export async function handleInboundMessage(
       tz: instance.timezone,
       phone,
       text,
+      messageId,
       port,
     };
 
@@ -184,7 +186,13 @@ async function clearConversation(systemId: string, tenantRef: string, phone: str
 async function send(base: ConvBase, message: string): Promise<void> {
   const number = toBrWhatsappNumber(base.phone);
   if (!number) return;
-  await sendText(base.instanceName, number, message);
+  await guardedSend({
+    instanceName: base.instanceName,
+    toPhone: number,
+    text: message,
+    kind: "ENGINE",
+    idempotencyKey: base.messageId ? `eng:${base.instanceName}:${base.messageId}` : undefined,
+  });
 }
 
 /**

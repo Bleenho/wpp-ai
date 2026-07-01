@@ -7,6 +7,7 @@ import { messagingRouter } from "./messaging/messaging.routes";
 import { webhookRouter } from "./webhook/webhook.routes";
 import { adminRouter } from "./admin/admin.routes";
 import { panelRouter } from "./panel/panel.routes";
+import { cleanupIdempotency } from "./idempotency/idempotency.service";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -31,3 +32,8 @@ app.use(webhookRouter); // /webhooks/evolution/:instanceName
 app.listen(env.PORT, () => {
   console.log(`[wpp-ai] ouvindo na porta ${env.PORT}`);
 });
+
+// Limpa registros de dedup (inbound/outbound) vencidos a cada 15 min.
+setInterval(() => {
+  void cleanupIdempotency();
+}, 15 * 60 * 1000);

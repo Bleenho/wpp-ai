@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { handleInboundMessage } from "../conversation/engine";
+import { recordInbound } from "../idempotency/idempotency.service";
 
 /**
  * Processa um evento de webhook da Evolution para uma instância (resolvida pelo
@@ -9,6 +10,7 @@ import { handleInboundMessage } from "../conversation/engine";
 interface EvoKey {
   remoteJid?: string;
   fromMe?: boolean;
+  id?: string;
 }
 interface EvoMessage {
   key?: EvoKey;
@@ -97,5 +99,9 @@ async function handleInbound(instanceName: string, data: EvoData): Promise<void>
   const text = msg?.message?.conversation ?? msg?.message?.extendedTextMessage?.text ?? "";
   if (!fromPhone || !text) return;
 
-  await handleInboundMessage(instanceName, fromPhone, text);
+  // Idempotência: se já processamos essa mensagem, ignora (não responde 2x).
+  const fresh = await recordInbound(instanceName, key.id);
+  if (!fresh) return;
+
+  await handleInboundMessage(instanceName, fromPhone, text, key.id);
 }

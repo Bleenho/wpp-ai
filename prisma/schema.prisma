@@ -114,3 +114,31 @@ model Conversation {
   @@index([systemId, tenantRef])
   @@map("conversations")
 }
+
+/// Idempotência de INBOUND: guarda o id da mensagem do WhatsApp por instância.
+/// Se já existe, o webhook ignora (não processa/responde duas vezes). TTL via sweep.
+model InboundMessage {
+  id           String   @id @default(cuid())
+  instanceName String
+  messageId    String
+  createdAt    DateTime @default(now())
+
+  @@unique([instanceName, messageId])
+  @@index([createdAt])
+  @@map("inbound_messages")
+}
+
+/// Idempotência + throttle de OUTBOUND. `idempotencyKey` único evita reenvio do
+/// mesmo código/resposta; a janela por (instanceName,toPhone) limita a taxa.
+model OutboundSend {
+  id             String   @id @default(cuid())
+  instanceName   String
+  toPhone        String
+  idempotencyKey String?  @unique
+  kind           String   @default("MESSAGE")
+  createdAt      DateTime @default(now())
+
+  @@index([instanceName, toPhone, createdAt])
+  @@index([createdAt])
+  @@map("outbound_sends")
+}

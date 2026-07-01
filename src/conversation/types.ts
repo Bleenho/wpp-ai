@@ -22,6 +22,8 @@ export interface ConvBase {
   phone: string;
   /** Texto já trimado. */
   text: string;
+  /** Id da mensagem recebida (WhatsApp) — usado como chave de idempotência do envio. */
+  messageId?: string;
   /** Porta do sistema (adaptador) já ligada ao sistema + tenant. */
   port: SystemPort;
 }
