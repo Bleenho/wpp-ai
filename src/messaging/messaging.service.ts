@@ -1,6 +1,6 @@
 import type { Flow } from "@prisma/client";
 import { prisma } from "../db";
-import { sendText } from "../evolution/client";
+import { guardedSend } from "./send";
 import { toBrWhatsappNumber, toLocalPhone, renderTemplate } from "../util/format";
 import { getFlowConfig } from "../flows/flow-config.service";
 import { confirmationMenu } from "../conversation/handlers/confirm";
@@ -22,6 +22,7 @@ export interface SendFlowInput {
 
 export interface SendResult {
   sent: boolean;
+  deduped?: boolean;
   reason?: string;
 }
 
@@ -40,9 +41,25 @@ export async function sendFlowMessage(systemId: string, input: SendFlowInput): P
   const rendered = renderTemplate(cfg.messageTpl, input.vars);
   const text = input.flow === "CONFIRMATION" ? confirmationMenu(rendered) : rendered;
 
-  const ok = await sendText(instance.instanceName, number, text);
-  if (!ok) return { sent: false, reason: "send_failed" };
+  // Trava estratégica: idempotência por (flow, agendamento) — o mesmo lembrete/
+  // confirmação do MESMO booking não sai duas vezes. Sem bookingId (ex.: aniversário),
+  // deduplica por (flow, tenant, telefone, dia). Throttle por destinatário embutido.
+  const dayBucket = Math.floor(Date.now() / 86_400_000);
+  const idempotencyKey = input.bookingId
+    ? `camp:${input.flow}:${input.bookingId}`
+    : `camp:${input.flow}:${input.tenantRef}:${toLocalPhone(input.clientPhone)}:${dayBucket}`;
 
+  const res = await guardedSend({
+    instanceName: instance.instanceName,
+    toPhone: number,
+    text,
+    kind: "CAMPAIGN",
+    idempotencyKey,
+  });
+  if (!res.sent) return { sent: false, reason: res.reason };
+
+  // Abre a conversa de confirmação mesmo em dedup (upsert idempotente) — garante
+  // que o contexto exista para a resposta 1/2/3 do cliente.
   if (input.flow === "CONFIRMATION" && input.bookingId) {
     await openConfirmationConversation(
       systemId,
@@ -52,5 +69,5 @@ export async function sendFlowMessage(systemId: string, input: SendFlowInput): P
       input.bookingId,
     );
   }
-  return { sent: true };
+  return { sent: true, deduped: res.deduped };
 }
