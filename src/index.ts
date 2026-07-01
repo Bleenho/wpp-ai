@@ -4,6 +4,7 @@ import { systemsRouter } from "./systems/systems.routes";
 import { instancesRouter } from "./instances/instances.routes";
 import { flowsRouter } from "./flows/flows.routes";
 import { messagingRouter } from "./messaging/messaging.routes";
+import { otpRouter } from "./otp/otp.routes";
 import { webhookRouter } from "./webhook/webhook.routes";
 import { adminRouter } from "./admin/admin.routes";
 import { panelRouter } from "./panel/panel.routes";
@@ -27,6 +28,7 @@ app.use(adminRouter); // /admin/instances, /admin/flows
 app.use(instancesRouter); // /v1/instances/*
 app.use(flowsRouter); // /v1/flows
 app.use(messagingRouter); // /v1/messages
+app.use(otpRouter); // /v1/otp/send
 app.use(webhookRouter); // /webhooks/evolution/:instanceName
 
 app.listen(env.PORT, () => {
