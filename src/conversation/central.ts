@@ -1,6 +1,6 @@
 import { prisma } from "../db";
 import { guardedSend } from "../messaging/send";
-import { toBrWhatsappNumber, toLocalPhone, onlyDigits, numbered } from "../util/format";
+import { toBrWhatsappNumber, toLocalPhone, onlyDigits, numbered, brPhoneVariants } from "../util/format";
 import { status as instanceStatus } from "../instances/instances.service";
 
 /**
@@ -14,7 +14,21 @@ import { status as instanceStatus } from "../instances/instances.service";
  */
 
 const TTL_MINUTES = 20;
-const CENTRAL_REF = "_central";
+/** tenantRef sentinela da instância CENTRAL do sistema (número do Agendota). */
+export const CENTRAL_REF = "_central";
+
+/**
+ * A instância é o número CENTRAL? O gate tem que ser por INSTÂNCIA, não por
+ * sistema: o mesmo System (isCentral=true) contém a instância `_central` E as
+ * instâncias por salão. Só a `_central` roda o bot de suporte; as demais rodam
+ * o motor normal (confirmar/remarcar/cancelar).
+ */
+export function isCentralInstance(inst: {
+  tenantRef: string;
+  system: { isCentral: boolean };
+}): boolean {
+  return inst.system.isCentral && inst.tenantRef === CENTRAL_REF;
+}
 
 export interface CentralInstance {
   instanceName: string;
@@ -43,8 +57,16 @@ function centralCfg(config: unknown): CentralCfg | null {
 }
 
 function ddiVariants(digits: string): string[] {
-  if (digits.length < 10) return [];
-  return digits.startsWith("55") ? [digits, digits.slice(2)] : [digits, `55${digits}`];
+  const local = toLocalPhone(digits);
+  if (local.length < 10) return [];
+  // Cobre 9º dígito (com/sem o 9) e DDI (com/sem 55) — o phoneNumber da instância
+  // pode ter sido salvo em qualquer dessas formas.
+  const set = new Set<string>();
+  for (const v of brPhoneVariants(local)) {
+    set.add(v);
+    set.add(`55${v}`);
+  }
+  return [...set];
 }
 
 /**

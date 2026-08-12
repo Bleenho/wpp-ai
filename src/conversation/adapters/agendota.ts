@@ -6,6 +6,7 @@ import {
   type ClientRef,
   type BookingRef,
   type CreateBookingInput,
+  type BookingActionInfo,
 } from "../ports";
 
 /**
@@ -93,6 +94,12 @@ export class AgendotaAdapter implements SystemPort {
   }
   confirmBooking(bookingId: string): Promise<{ ok: boolean }> {
     return this.post(`/api/integrations/wpp/${this.slug}/bookings/confirm`, { bookingId });
+  }
+  bookingActionInfo(bookingId: string): Promise<BookingActionInfo> {
+    return this.get(
+      `/api/integrations/wpp/${this.slug}/bookings/action-info?bookingId=${encodeURIComponent(bookingId)}`,
+      true,
+    );
   }
 
   // ---- HTTP helpers --------------------------------------------------------

@@ -3,6 +3,7 @@ import { env } from "../env";
 import {
   isConfigured,
   createInstance,
+  setWebhook,
   connectInstance,
   connectionState,
   logoutInstance,
@@ -53,6 +54,12 @@ export async function connect(
     const msg = (e as Error)?.message ?? "";
     if (!/already in use|exists/i.test(msg)) console.error("[instances] createInstance:", msg);
   }
+
+  // Reaponta o webhook ao PUBLIC_URL atual — cobre instância já existente (o
+  // webhook do create é ignorado nesse caso) ou PUBLIC_URL que mudou. Best-effort.
+  await setWebhook(instanceName, webhookUrl(instanceName)).catch((e) =>
+    console.error("[instances] setWebhook:", (e as Error)?.message),
+  );
 
   const qr = await connectInstance(instanceName, opts.number);
 

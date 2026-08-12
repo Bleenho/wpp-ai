@@ -7,6 +7,7 @@ import {
   type ClientRef,
   type BookingRef,
   type CreateBookingInput,
+  type BookingActionInfo,
 } from "../ports";
 
 /**
@@ -80,6 +81,15 @@ export class GenericAdapter implements SystemPort {
   }
   confirmBooking(bookingId: string): Promise<{ ok: boolean }> {
     return this.call("/bookings/confirm", { bookingId });
+  }
+  async bookingActionInfo(bookingId: string): Promise<BookingActionInfo> {
+    // Rota OPCIONAL do contrato generic. Se o sistema não a implementa, assume
+    // permissivo — a regra real é aplicada no /bookings/cancel|reschedule.
+    try {
+      return await this.call<BookingActionInfo>("/bookings/action-info", { bookingId });
+    } catch {
+      return { canCancel: true, canReschedule: true };
+    }
   }
 }
 

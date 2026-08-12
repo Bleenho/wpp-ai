@@ -57,6 +57,12 @@ export interface QrResult {
   pairingCode?: string;
 }
 
+const WEBHOOK_EVENTS = ["QRCODE_UPDATED", "CONNECTION_UPDATE", "MESSAGES_UPSERT"];
+
+function webhookPayload(url: string) {
+  return { enabled: true, url, byEvents: false, base64: true, events: WEBHOOK_EVENTS };
+}
+
 export async function createInstance(instanceName: string, webhookUrl: string): Promise<void> {
   await evoFetch("/instance/create", {
     method: "POST",
@@ -64,13 +70,21 @@ export async function createInstance(instanceName: string, webhookUrl: string): 
       instanceName,
       qrcode: true,
       integration: "WHATSAPP-BAILEYS",
-      webhook: {
-        url: webhookUrl,
-        byEvents: false,
-        base64: true,
-        events: ["QRCODE_UPDATED", "CONNECTION_UPDATE", "MESSAGES_UPSERT"],
-      },
+      webhook: webhookPayload(webhookUrl),
     }),
+  });
+}
+
+/**
+ * (Re)aponta o webhook da instância para `webhookUrl`. Necessário porque o
+ * webhook inline do /instance/create é ignorado quando a instância já existe (e
+ * fica preso à URL antiga se o PUBLIC_URL mudou). Idempotente. Lança em erro —
+ * chame best-effort.
+ */
+export async function setWebhook(instanceName: string, webhookUrl: string): Promise<void> {
+  await evoFetch(`/webhook/set/${encodeURIComponent(instanceName)}`, {
+    method: "POST",
+    body: JSON.stringify({ webhook: webhookPayload(webhookUrl) }),
   });
 }
 

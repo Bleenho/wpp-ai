@@ -1,10 +1,10 @@
 import { prisma } from "../db";
 import { guardedSend } from "../messaging/send";
-import { toBrWhatsappNumber, toLocalPhone, numbered } from "../util/format";
+import { toBrWhatsappNumber, toLocalPhone, brPhoneVariants, numbered } from "../util/format";
 import { makePort } from "./adapters";
 import type { ConvBase, ConvState, Flow, HandlerResult } from "./types";
 import { startFlow, dispatch } from "./handlers/registry";
-import { handleCentralInbound } from "./central";
+import { handleCentralInbound, isCentralInstance } from "./central";
 
 const TTL_MINUTES = 20;
 
@@ -30,10 +30,16 @@ export async function handleInboundMessage(
       where: { instanceName },
       include: { system: true },
     });
-    if (!instance || !instance.system.active) return;
+    if (!instance || !instance.system.active) {
+      console.info(`[engine] inbound ignorado: instância/sistema inativo (${instanceName})`);
+      return;
+    }
 
-    // Número central: bot de suporte que só responde a donos de salão.
-    if (instance.system.isCentral) {
+    // Número central: bot de suporte que só responde a donos de salão. Gate por
+    // INSTÂNCIA (tenantRef="_central"), não por sistema — senão as instâncias por
+    // salão do mesmo System isCentral cairiam no suporte e engoliriam a resposta.
+    if (isCentralInstance(instance)) {
+      console.info(`[engine] inbound -> central (${instanceName}, de ${fromPhone})`);
       await handleCentralInbound(
         { instanceName, systemId: instance.systemId, systemConfig: instance.system.config },
         fromPhone,
@@ -43,7 +49,7 @@ export async function handleInboundMessage(
       return;
     }
 
-    const phone = toLocalPhone(fromPhone);
+    let phone = toLocalPhone(fromPhone);
     const text = (rawText ?? "").trim();
     if (phone.length < 10 || !text) return;
 
@@ -67,7 +73,7 @@ export async function handleInboundMessage(
       return;
     }
 
-    const conv = await prisma.conversation.findUnique({
+    let conv = await prisma.conversation.findUnique({
       where: {
         systemId_tenantRef_clientPhone: {
           systemId: base.systemId,
@@ -76,18 +82,38 @@ export async function handleInboundMessage(
         },
       },
     });
+    // Tolerância ao 9º dígito: se não achou pelo número exato, tenta as variantes
+    // (com/sem o 9) e passa a usar o telefone com que a conversa foi salva.
+    if (!conv) {
+      const variants = brPhoneVariants(phone).filter((v) => v !== phone);
+      if (variants.length) {
+        conv = await prisma.conversation.findFirst({
+          where: { systemId: base.systemId, tenantRef: base.tenantRef, clientPhone: { in: variants } },
+        });
+        if (conv) {
+          phone = conv.clientPhone;
+          base.phone = phone;
+        }
+      }
+    }
     const fresh = conv && conv.expiresAt.getTime() > Date.now();
 
     // Atendimento automático desligado: o robô só faz envios (campanhas) e não
     // responde mensagens NOVAS. Conversas já em andamento (ex.: resposta da
     // confirmação que o próprio robô iniciou) continuam normalmente.
     const active = Boolean(fresh && conv!.flow);
-    if (!instance.autoReply && !active) return;
+    if (!instance.autoReply && !active) {
+      console.info(
+        `[engine] sem resposta: autoReply=off e sem conversa ativa (${instanceName}, ${phone}, conv=${conv ? conv.step : "none"})`,
+      );
+      return;
+    }
 
     let result: HandlerResult;
     if (lower === "menu") {
       result = await showMenu(base);
     } else if (fresh && conv!.flow) {
+      console.info(`[engine] dispatch flow=${conv!.flow} step=${conv!.step} (${phone})`);
       result = await dispatch(base, toState(conv!));
     } else if (fresh && conv!.step === "menu") {
       result = await handleMenuSelection(base, toState(conv!));
@@ -154,6 +180,20 @@ function expiry(): Date {
   return new Date(Date.now() + TTL_MINUTES * 60 * 1000);
 }
 
+/**
+ * Expiração da conversa de CONFIRMATION: o cliente pode responder 1/2/3 até o
+ * horário do agendamento (a confirmação sai ~24h antes). Piso de TTL_MINUTES
+ * (não expira antes disso) e teto de 7 dias (proteção contra datas absurdas).
+ */
+function confirmationExpiry(bookingStart?: Date): Date {
+  const now = Date.now();
+  const floor = now + TTL_MINUTES * 60 * 1000;
+  const cap = now + 7 * 24 * 60 * 60 * 1000;
+  const t = bookingStart?.getTime();
+  if (t == null || Number.isNaN(t)) return new Date(floor);
+  return new Date(Math.min(cap, Math.max(floor, t)));
+}
+
 async function persist(base: ConvBase, result: HandlerResult): Promise<void> {
   if (result.state === null) {
     await clearConversation(base.systemId, base.tenantRef, base.phone);
@@ -198,13 +238,16 @@ async function clearConversation(systemId: string, tenantRef: string, phone: str
 async function send(base: ConvBase, message: string): Promise<void> {
   const number = toBrWhatsappNumber(base.phone);
   if (!number) return;
-  await guardedSend({
+  const res = await guardedSend({
     instanceName: base.instanceName,
     toPhone: number,
     text: message,
     kind: "ENGINE",
     idempotencyKey: base.messageId ? `eng:${base.instanceName}:${base.messageId}` : undefined,
   });
+  if (!res.sent) {
+    console.info(`[engine] resposta não enviada (${res.reason ?? (res.deduped ? "deduped" : "?")}) p/ ${number}`);
+  }
 }
 
 /**
@@ -218,8 +261,10 @@ export async function openConfirmationConversation(
   clientPhone: string,
   clientId: string | null,
   bookingId: string,
+  bookingStart?: Date,
 ): Promise<void> {
   const key = { systemId_tenantRef_clientPhone: { systemId, tenantRef, clientPhone } };
+  const expiresAt = confirmationExpiry(bookingStart);
   await prisma.conversation.upsert({
     where: key,
     create: {
@@ -230,14 +275,14 @@ export async function openConfirmationConversation(
       flow: "CONFIRMATION",
       step: "await",
       context: { bookingId },
-      expiresAt: expiry(),
+      expiresAt,
     },
     update: {
       clientId,
       flow: "CONFIRMATION",
       step: "await",
       context: { bookingId },
-      expiresAt: expiry(),
+      expiresAt,
     },
   });
 }

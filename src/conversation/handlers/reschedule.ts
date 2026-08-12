@@ -17,17 +17,32 @@ function askDate(clientId: string, bookingId: string): HandlerResult {
   );
 }
 
+/** Checa a política ANTES de pedir a data: se não pode remarcar, avisa e encerra. */
+async function beginForBooking(base: ConvBase, clientId: string, bookingId: string): Promise<HandlerResult> {
+  let info;
+  try {
+    info = await base.port.bookingActionInfo(bookingId);
+  } catch (e) {
+    if (e instanceof PortError) return done(`❌ ${e.message}`);
+    throw e;
+  }
+  if (!info.canReschedule) {
+    return done(`❌ ${info.rescheduleReason ?? "Este horário não pode ser remarcado."}`);
+  }
+  return askDate(clientId, bookingId);
+}
+
 export async function startReschedule(
   base: ConvBase,
   clientId: string | null,
   seed: RescheduleSeed = {},
 ): Promise<HandlerResult> {
   if (!clientId) return done("Não encontrei agendamentos para este número. 🤔");
-  if (seed.bookingId) return askDate(clientId, seed.bookingId);
+  if (seed.bookingId) return beginForBooking(base, clientId, seed.bookingId);
 
   const { bookings } = await base.port.upcomingBookings(clientId);
   if (bookings.length === 0) return done("Você não tem nenhum agendamento futuro para remarcar.");
-  if (bookings.length === 1) return askDate(clientId, bookings[0].id);
+  if (bookings.length === 1) return beginForBooking(base, clientId, bookings[0].id);
 
   return next(
     `Qual agendamento você quer remarcar?\n${numbered(bookings.map((b) => b.label))}`,
@@ -46,7 +61,7 @@ export async function handleReschedule(base: ConvBase, state: ConvState): Promis
     const ids = (context.ids as string[]) ?? [];
     const choice = parseChoice(base.text, ids.length);
     if (!choice) return next("Escolha um número da lista.", "RESCHEDULE", "pick", context, clientId);
-    return askDate(clientId, ids[choice - 1]);
+    return beginForBooking(base, clientId, ids[choice - 1]);
   }
 
   if (step === "date") {
@@ -72,6 +87,22 @@ export async function handleReschedule(base: ConvBase, state: ConvState): Promis
     const choice = parseChoice(base.text, slots.length);
     if (!choice) return next("Escolha um número da lista.", "RESCHEDULE", "slot", context, clientId);
     const slot = slots[choice - 1];
+    // Pede confirmação final antes de efetivar (não remarca direto).
+    return next(
+      `Confirmar o novo horário: *${slot.label}*?\n${numbered(["Sim, remarcar", "Não, escolher outro"])}`,
+      "RESCHEDULE",
+      "confirm",
+      { bookingId: context.bookingId, slot },
+      clientId,
+    );
+  }
+
+  if (step === "confirm") {
+    const slot = context.slot as StoredSlot | undefined;
+    const choice = parseChoice(base.text, 2);
+    if (!choice || !slot)
+      return next("Responda *1* para confirmar ou *2* para escolher outro.", "RESCHEDULE", "confirm", context, clientId);
+    if (choice === 2) return done("Sem problema! Se quiser remarcar, é só chamar de novo. 😉");
     try {
       await base.port.rescheduleBooking(context.bookingId as string, slot.iso, slot.professionalId);
       return done(`✅ Remarcado! Seu novo horário é *${slot.label}*. Até lá! 😉`);

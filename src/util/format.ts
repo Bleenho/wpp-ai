@@ -18,6 +18,25 @@ export function toLocalPhone(raw: string): string {
   return d;
 }
 
+/**
+ * Variantes de um telefone LOCAL (sem DDI) tolerantes ao 9º dígito do celular BR.
+ * O WhatsApp às vezes entrega o JID sem o 9 (números antigos), então a conversa
+ * pode ter sido salva com o 9 e a resposta chegar sem — ou vice-versa.
+ * Ex.: "11987654321" -> ["11987654321","1187654321"]; "1187654321" -> ["1187654321","11987654321"].
+ * Sempre inclui o próprio número; só mexe em 10/11 dígitos (DDD + assinante).
+ */
+export function brPhoneVariants(local: string): string[] {
+  const d = onlyDigits(local);
+  const set = new Set<string>([d]);
+  if (d.length === 11 && d[2] === "9") {
+    set.add(d.slice(0, 2) + d.slice(3)); // remove o 9 -> 10 dígitos
+  } else if (d.length === 10) {
+    const sub = d.slice(2);
+    if (/^[6-9]/.test(sub)) set.add(`${d.slice(0, 2)}9${sub}`); // celular: adiciona o 9
+  }
+  return [...set];
+}
+
 export function formatMoneyBRL(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "R$ 0,00";
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

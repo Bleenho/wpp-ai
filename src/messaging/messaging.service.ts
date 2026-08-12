@@ -17,6 +17,8 @@ export interface SendFlowInput {
   clientPhone: string;
   clientId?: string;
   bookingId?: string;
+  /** Início do agendamento (ISO) — define até quando a conversa aceita 1/2/3. */
+  bookingStartIso?: string;
   vars: Record<string, string>;
 }
 
@@ -59,14 +61,17 @@ export async function sendFlowMessage(systemId: string, input: SendFlowInput): P
   if (!res.sent) return { sent: false, reason: res.reason };
 
   // Abre a conversa de confirmação mesmo em dedup (upsert idempotente) — garante
-  // que o contexto exista para a resposta 1/2/3 do cliente.
+  // que o contexto exista para a resposta 1/2/3 do cliente. A conversa fica válida
+  // até o horário do agendamento (bookingStartIso), não só 20 min.
   if (input.flow === "CONFIRMATION" && input.bookingId) {
+    const bookingStart = input.bookingStartIso ? new Date(input.bookingStartIso) : undefined;
     await openConfirmationConversation(
       systemId,
       input.tenantRef,
       toLocalPhone(input.clientPhone),
       input.clientId ?? null,
       input.bookingId,
+      bookingStart,
     );
   }
   return { sent: true, deduped: res.deduped };

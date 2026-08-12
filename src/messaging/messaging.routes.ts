@@ -11,6 +11,7 @@ const sendSchema = z.object({
   clientPhone: z.string().min(10),
   clientId: z.string().optional(),
   bookingId: z.string().optional(),
+  bookingStartIso: z.string().datetime().optional(),
   vars: z.record(z.string()).default({}),
 });
 

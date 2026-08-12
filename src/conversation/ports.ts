@@ -37,6 +37,15 @@ export interface CreateBookingInput {
   startTime: string;
 }
 
+/** Elegibilidade do cliente p/ cancelar/remarcar um booking (política do sistema). */
+export interface BookingActionInfo {
+  canCancel: boolean;
+  cancelReason?: string;
+  refundLabel?: string;
+  canReschedule: boolean;
+  rescheduleReason?: string;
+}
+
 /** Erro de regra de negócio do sistema — a mensagem vai para o cliente no chat. */
 export class PortError extends Error {}
 
@@ -52,4 +61,6 @@ export interface SystemPort {
   rescheduleBooking(bookingId: string, startTime: string, professionalId: string): Promise<{ ok: boolean }>;
   cancelBooking(bookingId: string): Promise<{ ok: boolean; refundLabel?: string }>;
   confirmBooking(bookingId: string): Promise<{ ok: boolean }>;
+  /** Pode cancelar/remarcar este booking? (o sistema aplica a política) */
+  bookingActionInfo(bookingId: string): Promise<BookingActionInfo>;
 }

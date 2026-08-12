@@ -99,9 +99,14 @@ async function handleInbound(instanceName: string, data: EvoData): Promise<void>
   const text = msg?.message?.conversation ?? msg?.message?.extendedTextMessage?.text ?? "";
   if (!fromPhone || !text) return;
 
+  console.info(`[webhook] inbound ${instanceName} de ${fromPhone}: "${text.slice(0, 40)}" (id=${key.id ?? "?"})`);
+
   // Idempotência: se já processamos essa mensagem, ignora (não responde 2x).
   const fresh = await recordInbound(instanceName, key.id);
-  if (!fresh) return;
+  if (!fresh) {
+    console.info(`[webhook] duplicada ignorada (id=${key.id})`);
+    return;
+  }
 
   await handleInboundMessage(instanceName, fromPhone, text, key.id);
 }
