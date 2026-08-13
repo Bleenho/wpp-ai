@@ -28,6 +28,40 @@ export interface SendResult {
   reason?: string;
 }
 
+/**
+ * Envio de TEXTO LIVRE, sem template nem fluxo: o sistema chamador já montou a
+ * mensagem inteira. Usado por campanhas (ex.: cobrança do fereoli), onde o texto
+ * varia por destinatário e não faz sentido guardar um `messageTpl` aqui.
+ * Não passa por `getFlowConfig` — não há toggle de fluxo para checar.
+ */
+export interface SendTextInput {
+  tenantRef: string;
+  clientPhone: string;
+  text: string;
+  /** Dedup do lado do chamador; sem ele, o mesmo texto pode sair duas vezes. */
+  idempotencyKey?: string;
+}
+
+export async function sendTextMessage(systemId: string, input: SendTextInput): Promise<SendResult> {
+  const instance = await prisma.instance.findUnique({
+    where: { systemId_tenantRef: { systemId, tenantRef: input.tenantRef } },
+  });
+  if (!instance || instance.status !== "CONNECTED") return { sent: false, reason: "not_connected" };
+
+  const number = toBrWhatsappNumber(input.clientPhone);
+  if (!number) return { sent: false, reason: "invalid_phone" };
+
+  const res = await guardedSend({
+    instanceName: instance.instanceName,
+    toPhone: number,
+    text: input.text,
+    kind: "CAMPAIGN",
+    idempotencyKey: input.idempotencyKey,
+  });
+  if (!res.sent) return { sent: false, reason: res.reason };
+  return { sent: true, deduped: res.deduped };
+}
+
 export async function sendFlowMessage(systemId: string, input: SendFlowInput): Promise<SendResult> {
   const cfg = await getFlowConfig(systemId, input.tenantRef, input.flow);
   if (!cfg || !cfg.enabled) return { sent: false, reason: "flow_disabled" };
