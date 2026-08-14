@@ -1,6 +1,7 @@
 import type { Flow } from "@prisma/client";
 import { prisma } from "../db";
 import { guardedSend } from "./send";
+import { checkWhatsapp } from "../evolution/client";
 import { toBrWhatsappNumber, toLocalPhone, renderTemplate } from "../util/format";
 import { getFlowConfig } from "../flows/flow-config.service";
 import { confirmationMenu } from "../conversation/handlers/confirm";
@@ -109,4 +110,44 @@ export async function sendFlowMessage(systemId: string, input: SendFlowInput): P
     );
   }
   return { sent: true, deduped: res.deduped };
+}
+
+/**
+ * Aviso simples (envio único) via o número do TENANT — sem menu, sem abrir
+ * conversa. Antes de enviar, confere se o número existe no WhatsApp e devolve
+ * isso ao sistema (`hasWhatsapp`) como garantia sem código.
+ */
+export interface SendNoticeInput {
+  tenantRef: string;
+  clientPhone: string;
+  text: string;
+  idempotencyKey?: string;
+}
+
+export interface NoticeResult {
+  sent: boolean;
+  hasWhatsapp: boolean | null;
+  reason?: string;
+}
+
+export async function sendNotice(systemId: string, input: SendNoticeInput): Promise<NoticeResult> {
+  const instance = await prisma.instance.findUnique({
+    where: { systemId_tenantRef: { systemId, tenantRef: input.tenantRef } },
+  });
+  if (!instance || instance.status !== "CONNECTED") return { sent: false, hasWhatsapp: null, reason: "not_connected" };
+
+  const number = toBrWhatsappNumber(input.clientPhone);
+  if (!number) return { sent: false, hasWhatsapp: null, reason: "invalid_phone" };
+
+  const hasWhatsapp = await checkWhatsapp(instance.instanceName, number);
+  if (hasWhatsapp === false) return { sent: false, hasWhatsapp: false, reason: "no_whatsapp" };
+
+  const res = await guardedSend({
+    instanceName: instance.instanceName,
+    toPhone: number,
+    text: input.text,
+    kind: "NOTICE",
+    idempotencyKey: input.idempotencyKey,
+  });
+  return { sent: res.sent, hasWhatsapp, reason: res.sent ? undefined : res.reason };
 }

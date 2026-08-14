@@ -133,6 +133,29 @@ export async function deleteInstance(instanceName: string): Promise<void> {
   );
 }
 
+/**
+ * Verifica se um número está registrado no WhatsApp (sem enviar nada). Retorna
+ * true/false, ou null se não deu para saber (não configurado/erro/resposta
+ * inesperada). `number` em formato internacional (dígitos com DDI).
+ */
+export async function checkWhatsapp(instanceName: string, number: string): Promise<boolean | null> {
+  if (!isConfigured()) return null;
+  try {
+    const data = await evoFetch<unknown>(`/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`, {
+      method: "POST",
+      body: JSON.stringify({ numbers: [number] }),
+    });
+    const arr = Array.isArray(data) ? data : [];
+    const hit = arr[0] as { exists?: boolean; jid?: string } | undefined;
+    if (!hit) return null;
+    if (typeof hit.exists === "boolean") return hit.exists;
+    return Boolean(hit.jid);
+  } catch (e) {
+    console.error("[evolution] checkWhatsapp:", (e as Error)?.message);
+    return null;
+  }
+}
+
 /** Best-effort: retorna boolean, nunca lança. `number` em formato internacional. */
 export async function sendText(instanceName: string, number: string, text: string): Promise<boolean> {
   if (!isConfigured()) {

@@ -1,9 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
 import { systemAuth } from "../auth";
-import { sendFlowMessage, sendTextMessage } from "./messaging.service";
+import { sendFlowMessage, sendTextMessage, sendNotice } from "./messaging.service";
 
 export const messagingRouter = Router();
+
+const noticeSchema = z.object({
+  tenantRef: z.string().min(1),
+  clientPhone: z.string().min(10),
+  text: z.string().min(1).max(2000),
+  idempotencyKey: z.string().min(1).max(200).optional(),
+});
 
 const sendTextSchema = z.object({
   tenantRef: z.string().min(1),
@@ -52,5 +59,20 @@ messagingRouter.post("/v1/messages/text", systemAuth, async (req, res) => {
     return;
   }
   const data = await sendTextMessage(req.system!.id, parsed.data);
+  res.json({ data });
+});
+
+/**
+ * Aviso simples (envio único): checa se o número tem WhatsApp e envia o texto
+ * pelo número do salão. Devolve `{ sent, hasWhatsapp }` — o sistema marca a
+ * existência do WhatsApp no cliente (garantia sem código).
+ */
+messagingRouter.post("/v1/notify", systemAuth, async (req, res) => {
+  const parsed = noticeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(422).json({ error: "Dados inválidos", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const data = await sendNotice(req.system!.id, parsed.data);
   res.json({ data });
 });
