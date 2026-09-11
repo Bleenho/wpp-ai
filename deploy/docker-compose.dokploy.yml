@@ -1,0 +1,99 @@
+# ============================================
+# wpp-ai — stack para o Dokploy (tipo "Compose", modo "Docker Compose").
+#
+# - Imagem do wpp-ai vem do GHCR (build em .github/workflows/deploy-vps.yml).
+# - `migrate` roda `prisma migrate deploy` (nao mais `db push`, que derruba
+#   colunas para convergir) e SAI; `wppai` so sobe se terminou com sucesso.
+# - NOMES DOS SERVICOS SAO CONTRATO: `wppai`, `evolution`, `redis`. A URL de
+#   webhook por instancia (http://wppai:8090/webhooks/...) esta GRAVADA no banco
+#   da Evolution; renomear faz as mensagens recebidas pararem em silencio.
+# - Sem caddy (Traefik do Dokploy: wpp.agendota.com -> wppai:8090) e sem
+#   `ports:` (o 8090 publicado era para o IP privado da VPC; o Agendota agora
+#   chama pelo dominio). A Evolution (8080) continua so interna.
+# - Env vars: o Dokploy grava .env ao lado deste arquivo. Mesmos nomes do
+#   deploy/.env da EC2, agora apontando para o Postgres do host:
+#     WPPAI_DATABASE_URL=postgresql://wppai:<senha>@172.17.0.1:5432/wppai?schema=wppai
+#     EVOLUTION_DATABASE_URI=postgresql://wppai:<senha>@172.17.0.1:5432/wppai?schema=evolution
+#       (SEM sslmode)
+#     EVOLUTION_IMAGE=evoapicloud/evolution-api@sha256:...   (digest pinado na Fase 0.4)
+#     EVOLUTION_API_KEY, EVOLUTION_WEBHOOK_TOKEN, WPPAI_ADMIN_API_KEY (iguais aos da EC2)
+# ============================================
+services:
+  migrate:
+    image: ghcr.io/bleenho/wpp-ai:${IMAGE_TAG:-latest}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: ${WPPAI_DATABASE_URL:?WPPAI_DATABASE_URL obrigatoria}
+    restart: "no"
+
+  wppai:
+    image: ghcr.io/bleenho/wpp-ai:${IMAGE_TAG:-latest}
+    environment:
+      PORT: "8090"
+      PUBLIC_URL: "http://wppai:8090" # webhook Evolution -> wppai (rede interna)
+      DATABASE_URL: ${WPPAI_DATABASE_URL}
+      EVOLUTION_API_URL: "http://evolution:8080"
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN}
+      ADMIN_API_KEY: ${WPPAI_ADMIN_API_KEY}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      evolution:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8090/health').then(r=>{if(!r.ok)throw new Error(r.status)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  evolution:
+    image: ${EVOLUTION_IMAGE:?EVOLUTION_IMAGE obrigatoria (digest pinado na Fase 0.4)}
+    environment:
+      SERVER_URL: "http://evolution:8080"
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "postgresql"
+      DATABASE_CONNECTION_URI: ${EVOLUTION_DATABASE_URI:?EVOLUTION_DATABASE_URI obrigatoria}
+      DATABASE_CONNECTION_CLIENT_NAME: "evolution"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://redis:6379/6"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      # false => credenciais Baileys ficam no Postgres (evolution."Session"), nao
+      # no Redis. E' o que torna o dump do schema `evolution` a fonte da verdade.
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      - redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # ~150-300 MB base + 50-120 MB por numero conectado. Subir se passar de ~10 numeros.
+          memory: 2g
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+volumes:
+  evolution_instances:
+  redis_data:

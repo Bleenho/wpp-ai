@@ -38,7 +38,11 @@ services:
       - evolution
 
   evolution:
-    image: evoapicloud/evolution-api:latest
+    # Migracao p/ VPS (Fase 0.4): pinar por digest via deploy/.env, ex.:
+    #   EVOLUTION_IMAGE=evoapicloud/evolution-api@sha256:<digest rodando hoje>
+    # (docker inspect --format '{{index .RepoDigests 0}}' <container>).
+    # Sem a variavel continua em :latest, como antes.
+    image: ${EVOLUTION_IMAGE:-evoapicloud/evolution-api:latest}
     restart: unless-stopped
     environment:
       SERVER_URL: "http://evolution:8080"

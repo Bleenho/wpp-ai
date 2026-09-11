@@ -17,7 +17,7 @@ FROM base AS run
 ENV NODE_ENV=production
 COPY package*.json ./
 # Carrega node_modules do build (já com o Prisma Client gerado + a CLI do Prisma
-# para rodar `prisma db push` no deploy).
+# para o serviço `migrate` rodar `prisma migrate deploy` antes do app subir).
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
