@@ -47,7 +47,11 @@ services:
         limits:
           memory: 512m
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:8090/health').then(r=>{if(!r.ok)throw new Error(r.status)})"]
+      # 127.0.0.1, NAO localhost: o /etc/hosts do container mapeia localhost para
+      # IPv4 e IPv6, o cliente tenta [::1] primeiro e o servidor escuta so em
+      # 0.0.0.0 -> healthcheck falha para sempre. Como o `cron` depende de
+      # `service_healthy`, ele nunca subiria e os lembretes parariam em silencio.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/health').then(r=>{if(!r.ok)throw new Error(r.status)})"]
       interval: 15s
       timeout: 5s
       retries: 5
