@@ -66,4 +66,18 @@ jobs:
     if: vars.DOKPLOY_WEBHOOK_WPPAI != ''
     steps:
       - name: Webhook
-        run: curl -fsS -X POST "${{ vars.DOKPLOY_WEBHOOK_WPPAI }}"
+        # O Dokploy quer o header `x-github-event` e um corpo com o ref. Sem
+        # isso ele responde {"message":"Branch Not Match"} com status **301** --
+        # e `curl -f` nao falha em 3xx, so em 4xx/5xx. Era por isso que este job
+        # ficava VERDE sem deployar nada: em 15/09 a VPS ainda rodava a imagem
+        # buildada em 11/09, e nenhum sinal apontava para isso.
+        # Dai a conferencia explicita do 200 -- o `-f` sozinho nao basta aqui.
+        run: |
+          code=$(curl -sS -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'x-github-event: push' \
+            -d '{"ref":"refs/heads/main","repository":{"default_branch":"main"}}' \
+            -o /tmp/dokploy.json -w '%{http_code}' \
+            "${{ vars.DOKPLOY_WEBHOOK_WPPAI }}")
+          echo "HTTP $code -- $(cat /tmp/dokploy.json)"
+          [ "$code" = "200" ] || { echo "::error::Dokploy nao deployou (esperado HTTP 200)"; exit 1; }

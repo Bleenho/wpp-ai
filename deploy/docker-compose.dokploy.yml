@@ -21,6 +21,10 @@
 services:
   migrate:
     image: ghcr.io/bleenho/wpp-ai:${IMAGE_TAG:-latest}
+    # `up -d` NAO rebusca uma tag que ja existe em disco (pull_policy padrao =
+    # missing). Sem isto o deploy fica VERDE rodando a imagem velha -- o CI
+    # publica :latest novo e a VPS continua na anterior, em silencio.
+    pull_policy: always
     command: ["npx", "prisma", "migrate", "deploy"]
     environment:
       DATABASE_URL: ${WPPAI_DATABASE_URL:?WPPAI_DATABASE_URL obrigatoria}
@@ -28,6 +32,10 @@ services:
 
   wppai:
     image: ghcr.io/bleenho/wpp-ai:${IMAGE_TAG:-latest}
+    # `up -d` NAO rebusca uma tag que ja existe em disco (pull_policy padrao =
+    # missing). Sem isto o deploy fica VERDE rodando a imagem velha -- o CI
+    # publica :latest novo e a VPS continua na anterior, em silencio.
+    pull_policy: always
     environment:
       PORT: "8090"
       PUBLIC_URL: "http://wppai:8090" # webhook Evolution -> wppai (rede interna)
