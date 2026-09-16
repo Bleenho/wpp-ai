@@ -9,18 +9,26 @@ name: Deploy
 #   WPPAI_EC2_USER     -> ec2-user
 #   WPPAI_EC2_SSH_KEY  -> conteúdo do wppai-key.pem (gerado pelo Terraform)
 
+# CORTADO PARA A VPS EM 2026-09-16. Os containers `wppai` e `evolution` da EC2
+# estao PARADOS e o wpp.agendota.com aponta para 2.25.183.187. Este workflow
+# deixou de disparar em push de proposito -- com a stack parada ele so produziria
+# execucao vermelha. Fica acionavel a mao durante a semana de observacao, como
+# caminho de volta: `docker compose -f deploy/docker-compose.aws.yml start
+# evolution wppai` na EC2 e o A de volta para 54.88.119.142.
+#
+# ⚠️ VOLTAR PARA A AWS DESLOGA O WHATSAPP. As credenciais Baileys sao as mesmas
+# nos dois lados; subir a Evolution da EC2 com a da VPS no ar faz o WhatsApp ver
+# dois aparelhos com a mesma identidade. Se for preciso voltar, PARAR a da VPS
+# primeiro.
+#
+# Passada a observacao, apagar este arquivo e o deploy/Caddyfile.
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "infra/**"
-      - "**.md"
+  workflow_dispatch:
 
 jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     steps:
       - name: SSH deploy
         uses: appleboy/ssh-action@v1
