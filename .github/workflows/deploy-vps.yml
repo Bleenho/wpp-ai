@@ -9,10 +9,7 @@ name: Deploy VPS (GHCR + Dokploy)
 
 on:
   push:
-    # `vps-prep` e' temporaria: o Dokploy le o compose do clone desta branch
-    # durante o preparo, sem acordar o deploy.yml da EC2 (que so escuta `main`).
-    # REMOVER desta lista no merge do corte.
-    branches: [main, vps-prep]
+    branches: [main]
     paths-ignore:
       - "infra/**"
       - "**.md"
